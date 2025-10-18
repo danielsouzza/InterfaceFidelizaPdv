@@ -2,3 +2,12 @@ node_modules/
 package-lock.json
 .env
 sql-config.json
+
+# Electron build output
+dist/
+out/
+*.exe
+*.msi
+*.dmg
+*.deb
+*.rpm

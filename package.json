@@ -2,17 +2,22 @@
   "name": "interface-fideliza-pdv",
   "version": "1.0.0",
   "description": "Interface para sistema de fidelidade PDV",
-  "main": "server.js",
+  "main": "electron-main.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "electron": "electron .",
+    "electron:dev": "electron . --inspect",
+    "build": "electron-builder build --win --publish never",
+    "build:dir": "electron-builder build --win --dir",
+    "build:linux": "electron-builder build --linux --dir"
   },
   "keywords": [
     "fidelidade",
     "pdv",
     "api"
   ],
-  "author": "",
+  "author": "Sistema Fidelidade",
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
@@ -21,6 +26,43 @@
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
+    "electron": "^38.3.0",
+    "electron-builder": "^26.0.12",
     "nodemon": "^3.0.1"
+  },
+  "build": {
+    "appId": "com.fidelizapdv.app",
+    "productName": "Sistema Fidelidade PDV",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/electron/**/*",
+      "!node_modules/electron-builder/**/*",
+      "!dist/**/*",
+      "!.git/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sistema Fidelidade PDV"
+    }
   }
 }
