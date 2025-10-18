@@ -50,7 +50,7 @@ function createSqlConnection() {
         return {
             connectionString: sqlConfig.connectionString,
             options: sqlConfig.options || {
-                encrypt: true,
+                encrypt: false,
                 trustServerCertificate: true,
                 enableArithAbort: true
             }
