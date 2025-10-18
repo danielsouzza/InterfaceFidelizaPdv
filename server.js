@@ -65,7 +65,7 @@ function createSqlConnection() {
         password: sqlConfig.password,
         port: sqlConfig.port,
         options: sqlConfig.options || {
-            encrypt: true,
+            encrypt: false,
             trustServerCertificate: true,
             enableArithAbort: true
         }
