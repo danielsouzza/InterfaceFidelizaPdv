@@ -26,8 +26,8 @@
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "electron": "^38.3.0",
-    "electron-builder": "^26.0.12",
+    "electron": "^22.3.27",
+    "electron-builder": "^24.13.3",
     "nodemon": "^3.0.1"
   },
   "build": {
@@ -56,9 +56,6 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "icon.ico",
-      "uninstallerIcon": "icon.ico",
-      "installerHeaderIcon": "icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Sistema Fidelidade PDV"
