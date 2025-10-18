@@ -10,7 +10,8 @@
     "electron:dev": "electron . --inspect",
     "build": "electron-builder build --win --publish never",
     "build:dir": "electron-builder build --win --dir",
-    "build:linux": "electron-builder build --linux --dir"
+    "build:linux": "electron-builder build --linux --publish never",
+    "build:linux:dir": "electron-builder build --linux --dir"
   },
   "keywords": [
     "fidelidade",
@@ -59,6 +60,24 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Sistema Fidelidade PDV"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Office",
+      "maintainer": "Sistema Fidelidade"
     }
   }
 }
