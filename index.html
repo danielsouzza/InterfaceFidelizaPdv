@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Fidelidade - PDV</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="layout-container">
+        <!-- Conteúdo Principal -->
+        <div class="main-content">
+            <div class="container">
+                <header>
+                    <h1>Obsoft</h1>
+                </header>
+
+                <main class="card">
+                    <form id="loyalty-form">
+                        <div class="form-group">
+                            <label for="cpf">Insira o CPF/Telefone do Cliente</label>
+                            <div class="search-container">
+                                <input
+                                    type="text"
+                                    id="cpf"
+                                    placeholder="000.000.000-00 ou (00) 00000-0000"
+                                    autocomplete="off"
+                                >
+                                <button type="button" class="search-btn" id="search-btn">
+                                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                        <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM18 18l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                    </svg>
+                                    Buscar Clientes
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="value">Valor da Compra</label>
+                            <input
+                                type="text"
+                                id="value"
+                                placeholder="R$ 0,00"
+                                disabled
+                            >
+                        </div>
+
+                        <button type="button" class="action-btn green" id="register-score-btn" disabled>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M10 2v16M2 10h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                            Cadastrar e Pontuar
+                        </button>
+
+                        <div class="action-buttons">
+                            <button type="button" class="action-btn blue" id="register-client-btn">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M4 18c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" stroke-width="2"/>
+                                </svg>
+                                Cadastrar Cliente
+                            </button>
+                            <button type="button" class="action-btn yellow" id="history-client-btn">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M10 6v4l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                </svg>
+                                Histórico do Cliente
+                            </button>
+                        </div>
+                    </form>
+                </main>
+            </div>
+        </div>
+
+        <!-- Painel Lateral - Cliente Não Cadastrado -->
+        <aside id="sidebar-not-found" class="sidebar hidden">
+            <div class="sidebar-content">
+                <button class="sidebar-close" id="close-not-found">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+
+                <h2 class="sidebar-title error">Cliente não Cadastrado</h2>
+
+                <div class="sidebar-body">
+                    <h3>Gostaria de cadastrar o cliente agora?</h3>
+                    <p>A pontuação será concluida automaticamente após finalizar o cadastro!</p>
+
+                    <button class="btn-register" id="btn-open-register">
+                        Cadastrar o Cliente Agora
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Painel Lateral - Cliente Identificado -->
+        <aside id="sidebar-identified" class="sidebar hidden">
+            <div class="sidebar-content">
+                <button class="sidebar-close" id="close-identified">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+
+                <h2 class="sidebar-title">Cliente Identificado</h2>
+
+                <div class="sidebar-body">
+                    <h3 id="identified-name" class="customer-name">DANIEL LIMA DE SOUZA</h3>
+
+                    <div class="customer-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">pontos Disponíveis</span>
+                            <span class="stat-value green" id="identified-points">5.201</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Cashback Disponível</span>
+                            <span class="stat-value green" id="identified-cashback">R$ 52,01</span>
+                        </div>
+                    </div>
+
+                    <div class="customer-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Documento do Cliente</span>
+                            <span class="detail-value" id="identified-document">040.727.422-79</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Categoria</span>
+                            <span class="detail-value" id="identified-category">Prata</span>
+                        </div>
+                    </div>
+
+                    <button class="btn-edit" id="btn-edit-customer">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M11 2l3 3-9 9H2v-3l9-9z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                        Editar Cadastro
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Modal de Cadastro -->
+        <div id="register-modal" class="modal hidden">
+            <div class="modal-content">
+                <button class="modal-close" id="close-register-modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+
+                <h2 class="modal-title" id="modal-title">Cadastrar Cliente</h2>
+
+                <form id="register-form" class="register-form">
+                    <input type="hidden" id="modal-mode" value="create">
+                    <div class="form-group">
+                        <input type="text" id="reg-name" placeholder="Nome Completo *" required>
+                    </div>
+
+                    <div class="form-group">
+                        <input type="text" id="reg-document" placeholder="Documento (CPF - Opcional)">
+                    </div>
+
+                    <div class="form-group gender-group">
+                        <label class="radio-label">
+                            <input type="radio" name="gender" value="M">
+                            <span>Masculino</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="gender" value="F">
+                            <span>Feminino</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="gender" value="O">
+                            <span>Prefiro não compartilhar</span>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <input type="text" id="reg-birthdate" placeholder="Data de Nascimento (dd/mm/aaaa)" maxlength="10">
+                    </div>
+
+                    <div class="form-group">
+                        <input type="email" id="reg-email" placeholder="E-mail">
+                    </div>
+
+                    <div class="form-group">
+                        <input type="tel" id="reg-phone" placeholder="Telefone *" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="textarea-label">Observações</label>
+                        <textarea id="reg-notes" placeholder="Digite aqui" rows="4"></textarea>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" id="btn-cancel-register">Cancelar</button>
+                        <button type="submit" class="btn-submit" id="btn-submit-register">Cadastrar Cliente</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal de Histórico -->
+        <div id="history-modal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <button class="modal-close" id="close-history-modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+
+                <h2 class="modal-title">Histórico do Cliente</h2>
+
+                <div id="history-content">
+                    <!-- Informações do Cliente -->
+                    <div class="history-header">
+                        <h3 id="history-client-name">Nome do Cliente</h3>
+                        <div class="history-stats">
+                            <div class="history-stat">
+                                <span class="stat-label">Pontos Disponíveis</span>
+                                <span class="stat-value green" id="history-points">0</span>
+                            </div>
+                            <div class="history-stat">
+                                <span class="stat-label">Pontos a Expirar</span>
+                                <span class="stat-value orange" id="history-points-expire">0</span>
+                            </div>
+                            <div class="history-stat">
+                                <span class="stat-label">Cashback</span>
+                                <span class="stat-value green" id="history-cashback">R$ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Produtos Disponíveis -->
+                    <div class="products-section">
+                        <h3 class="section-title">🎁 Produtos Disponíveis para Resgate</h3>
+                        <div id="products-grid" class="products-grid">
+                            <!-- Produtos serão inseridos aqui via JavaScript -->
+                        </div>
+                        <div id="no-products" class="no-products hidden">
+                            <p>Nenhum produto disponível no momento.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Sucesso na Pontuação -->
+        <div id="success-modal" class="modal hidden">
+            <div class="modal-content modal-success">
+               
+
+                <h2 class="success-title">Cliente pontuado com sucesso!</h2>
+
+                <div class="success-details">
+                    <p class="success-transaction">
+                        A compra no valor de <strong id="success-value">R$ 10,00</strong>
+                        equivalente a <strong id="success-points-earned">10 pontos</strong>
+                        para <strong id="success-client-name">DANIEL LIMA DE SOUZA</strong>
+                    </p>
+
+                    <div class="success-balance">
+                        <div class="balance-item">
+                            <span class="balance-label">Saldo Atual:</span>
+                            <span class="balance-value" id="success-current-points">5221 pontos</span>
+                        </div>
+                    
+                    </div>
+                </div>
+
+                <button class="btn-close-success" id="btn-close-success">Fechar</button>
+            </div>
+        </div>
+
+        <!-- Modal de Configuração SQL Server -->
+        <div id="sql-config-modal" class="modal hidden">
+            <div class="modal-content">
+                <button class="modal-close" id="close-sql-config-modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+
+                <h2 class="modal-title">Configuração SQL Server</h2>
+
+                <form id="sql-config-form" class="register-form">
+                    <div class="form-group">
+                        <label class="input-label">Servidor</label>
+                        <input type="text" id="sql-server" placeholder="localhost ou 0.0.0.0" value="localhost">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">Banco de Dados *</label>
+                        <input type="text" id="sql-database" placeholder="Nome do banco" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">Usuário</label>
+                        <input type="text" id="sql-user" placeholder="sa" value="sa">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">Senha</label>
+                        <input type="password" id="sql-password" placeholder="Digite a senha">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="input-label">Porta</label>
+                        <input type="number" id="sql-port" placeholder="1433" value="1433">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="textarea-label">Query SQL para buscar última venda</label>
+                        <textarea id="sql-query" placeholder="SELECT TOP 1 numero_nota, valor FROM Notas ORDER BY data_nota DESC" rows="3">SELECT TOP 1 numero_nota, valor FROM Notas ORDER BY data_nota DESC, id DESC</textarea>
+                        <small class="form-hint">A query deve retornar pelo menos um campo numérico com o valor da venda</small>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn-cancel" id="btn-test-sql">Testar Conexão</button>
+                        <button type="submit" class="btn-submit">Salvar Configuração</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="notification" class="notification hidden"></div>
+
+        <!-- Botão flutuante para abrir configurações SQL -->
+        <button id="btn-open-sql-config" class="floating-btn" title="Configurar SQL Server">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+                <path d="M12 2v4m0 12v4M2 12h4m12 0h4" stroke="currentColor" stroke-width="2"/>
+            </svg>
+        </button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

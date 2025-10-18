@@ -1,0 +1,1281 @@
+// Configuração da API
+const API_CONFIG = {
+    baseUrl: 'http://localhost:3001/api',
+    endpoints: {
+        searchClient: '/buscar-cliente',
+        addPoints: '/pontuar-cliente',
+        registerClient: '/cadastrar-cliente',
+        updateClient: '/atualizar-cliente',
+        getClientData: '/dados-cliente'
+    }
+};
+
+// URL direta da API Fidelimax
+const FIDELIMAX_API = {
+    baseUrl: 'https://api.fidelimax.com.br/api/Integracao',
+    consultClient: '/ConsultaConsumidor',
+    addPoints: '/PontuaConsumidor'
+};
+
+// Elementos do DOM
+const cpfInput = document.getElementById('cpf');
+const valueInput = document.getElementById('value');
+const searchBtn = document.getElementById('search-btn');
+const registerScoreBtn = document.getElementById('register-score-btn');
+const registerClientBtn = document.getElementById('register-client-btn');
+const historyClientBtn = document.getElementById('history-client-btn');
+
+// Sidebars
+const sidebarNotFound = document.getElementById('sidebar-not-found');
+const sidebarIdentified = document.getElementById('sidebar-identified');
+const closeNotFound = document.getElementById('close-not-found');
+const closeIdentified = document.getElementById('close-identified');
+const btnOpenRegister = document.getElementById('btn-open-register');
+const btnEditCustomer = document.getElementById('btn-edit-customer');
+const mainContent = document.querySelector('.main-content');
+
+// Modal Cadastro
+const registerModal = document.getElementById('register-modal');
+const closeRegisterModalBtn = document.getElementById('close-register-modal');
+const btnCancelRegister = document.getElementById('btn-cancel-register');
+const registerForm = document.getElementById('register-form');
+const regDocument = document.getElementById('reg-document');
+
+// Modal Histórico
+const historyModal = document.getElementById('history-modal');
+const closeHistoryModalBtn = document.getElementById('close-history-modal');
+
+// Modal Sucesso
+const successModal = document.getElementById('success-modal');
+const btnCloseSuccess = document.getElementById('btn-close-success');
+
+let selectedCustomer = null;
+let searchedInput = ''; // CPF ou telefone buscado
+
+// Função para formatar CPF
+function formatCPF(cpf) {
+    const cleaned = cpf.replace(/\D/g, '');
+    return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+// Função para limpar formatação
+function cleanInput(input) {
+    return input.replace(/\D/g, '');
+}
+
+// Função para formatar moeda
+function formatCurrency(value) {
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    }).format(value);
+}
+
+// Função para formatar número de pontos
+function formatPoints(points) {
+    return new Intl.NumberFormat('pt-BR').format(points);
+}
+
+// Função para detectar tipo de entrada (CPF ou telefone) usando regex
+function detectInputType(input) {
+    const cleaned = cleanInput(input);
+
+    // Se não tem 11 dígitos, retorna null
+    if (cleaned.length !== 11) {
+        return null;
+    }
+
+    // Para 11 dígitos, verificar se é telefone celular
+    // Telefone celular: DDD (11-99) + 9 + 8 dígitos
+    // Exemplo: 11999998888 (terceiro dígito é 9)
+    const thirdDigit = cleaned.charAt(2);
+
+    if (thirdDigit === '9') {
+        // É um telefone celular (DDD + 9 + 8 dígitos)
+        return 'telefone';
+    } else {
+        // É um CPF
+        return 'cpf';
+    }
+}
+
+// Função para buscar/consultar cliente via proxy local
+async function searchClients(query) {
+    const cleaned = cleanInput(query);
+
+    if (cleaned.length !== 11) {
+        return [];
+    }
+
+    const inputType = detectInputType(query);
+    if (!inputType) {
+        return [];
+    }
+
+    try {
+        const requestBody = {};
+
+        if (inputType === 'cpf') {
+            requestBody.cpf = cleaned;
+        } else {
+            requestBody.telefone = cleaned;
+        }
+
+        console.log('Consultando consumidor:', requestBody);
+
+        // Usar o proxy local para evitar CORS
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.searchClient}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro na API: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        console.log('Resposta ConsultaConsumidor:', data);
+
+        // Normalizar resposta da API Fidelimax ConsultaConsumidor
+        if (data && data.CodigoResposta === 100 && data.consumidor_existente) {
+            return [{
+                id: cleaned,
+                name: data.nome,
+                cpf: inputType === 'cpf' ? cleaned : '',
+                phone: inputType === 'telefone' ? cleaned : '',
+                points: data.saldo || 0,
+                pointsToExpire: data.pontos_expirar || 0,
+                cashback: data.cashback || 0,
+                category: data.categoria || 'Padrão',
+                frozen: data.congelado || false,
+                products: data.produtos || [],
+                config: data.configuracao_programa || {},
+                email: '',
+                dataCadastro: '',
+                dataUltimaCompra: ''
+            }];
+        }
+
+        return [];
+    } catch (error) {
+        console.error('Erro ao buscar clientes:', error);
+        showNotification('Erro ao buscar clientes. Verifique a conexão.', 'error');
+        return [];
+    }
+}
+
+// Função para pontuar consumidor
+async function addPointsToCustomer(customer, purchaseValue, options = {}) {
+    try {
+        const requestBody = {
+            pontuacao_reais: purchaseValue
+        };
+
+        // Adicionar CPF ou telefone (obrigatório se cartao não for enviado)
+        if (customer.cpf) {
+            requestBody.cpf = cleanInput(customer.cpf);
+        } else if (customer.phone) {
+            requestBody.telefone = cleanInput(customer.phone);
+        }
+
+        // Campos opcionais
+        if (options.cartao) {
+            requestBody.cartao = options.cartao;
+        }
+        if (options.tipo_compra) {
+            requestBody.tipo_compra = options.tipo_compra;
+        }
+        if (options.verificador) {
+            requestBody.verificador = options.verificador;
+        }
+        if (options.estorno !== undefined) {
+            requestBody.estorno = options.estorno;
+        }
+
+        console.log('Enviando pontuação:', requestBody);
+
+        // Usar o proxy local para evitar CORS
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.addPoints}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro na API: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        console.log('Resposta da pontuação:', data);
+
+        // Verificar se a pontuação foi bem sucedida
+        if (data && data.CodigoResposta === 100) {
+            return {
+                success: true,
+                message: data.Mensagem || 'Pontos adicionados com sucesso!',
+                data: data
+            };
+        } else {
+            return {
+                success: false,
+                message: data.Mensagem || 'Erro ao adicionar pontos',
+                data: data
+            };
+        }
+    } catch (error) {
+        console.error('Erro ao pontuar cliente:', error);
+        return {
+            success: false,
+            message: 'Erro ao conectar com o servidor',
+            error: error
+        };
+    }
+}
+
+// Função para selecionar cliente
+function selectCustomer(client) {
+    selectedCustomer = client;
+
+    // Mostrar painel lateral de cliente identificado
+    showIdentifiedSidebar(client);
+
+    // Habilitar campo de valor e botão
+    valueInput.disabled = false;
+    registerScoreBtn.disabled = false;
+}
+
+// Função para mostrar sidebar de cliente identificado
+function showIdentifiedSidebar(client) {
+    // Fechar outros painéis
+    closeSidebarNotFound();
+
+    // Preencher dados do cliente
+    document.getElementById('identified-name').textContent = client.name.toUpperCase();
+    document.getElementById('identified-points').textContent = formatPoints(client.points);
+
+    // Cashback já vem no formato correto (não precisa dividir por 100)
+    document.getElementById('identified-cashback').textContent = formatCurrency(client.cashback);
+
+    document.getElementById('identified-document').textContent = client.cpf ? formatCPF(client.cpf) : client.phone;
+    document.getElementById('identified-category').textContent = client.category || 'Padrão';
+
+    console.log('Cliente selecionado:', {
+        nome: client.name,
+        pontos: client.points,
+        pontos_expirar: client.pointsToExpire,
+        cashback: client.cashback,
+        categoria: client.category,
+        congelado: client.frozen,
+        produtos_disponiveis: client.products?.length || 0
+    });
+
+    // Mostrar sidebar
+    sidebarIdentified.classList.remove('hidden');
+    setTimeout(() => {
+        sidebarIdentified.classList.add('show');
+        mainContent.classList.add('with-sidebar');
+    }, 10);
+}
+
+// Função para fechar sidebar identificado
+function closeSidebarIdentified() {
+    sidebarIdentified.classList.remove('show');
+    mainContent.classList.remove('with-sidebar');
+    setTimeout(() => {
+        sidebarIdentified.classList.add('hidden');
+    }, 300);
+}
+
+// Função para mostrar sidebar de cliente não encontrado
+function showNotFoundSidebar(input) {
+    // Fechar outros painéis
+    closeSidebarIdentified();
+
+    searchedInput = input;
+
+    // Mostrar sidebar
+    sidebarNotFound.classList.remove('hidden');
+    setTimeout(() => {
+        sidebarNotFound.classList.add('show');
+        mainContent.classList.add('with-sidebar');
+    }, 10);
+}
+
+// Função para fechar sidebar não encontrado
+function closeSidebarNotFound() {
+    sidebarNotFound.classList.remove('show');
+    mainContent.classList.remove('with-sidebar');
+    setTimeout(() => {
+        sidebarNotFound.classList.add('hidden');
+    }, 300);
+}
+
+// Função para mostrar modal de cadastro
+function showRegisterModal(input = '', mode = 'create') {
+    // Definir o modo do modal
+    document.getElementById('modal-mode').value = mode;
+
+    // Atualizar título e botão de acordo com o modo
+    const modalTitle = document.getElementById('modal-title');
+    const submitBtn = document.getElementById('btn-submit-register');
+
+    if (mode === 'edit') {
+        modalTitle.textContent = 'Editar Cliente';
+        submitBtn.textContent = 'Atualizar Cliente';
+    } else {
+        modalTitle.textContent = 'Cadastrar Cliente';
+        submitBtn.textContent = 'Cadastrar Cliente';
+    }
+
+    // Preencher campo correto se fornecido (detectar se é CPF ou telefone)
+    if (input && mode === 'create') {
+        const inputType = detectInputType(input);
+
+        if (inputType === 'cpf') {
+            // É CPF - preencher campo de documento
+            regDocument.value = formatCPF(input);
+        } else if (inputType === 'telefone') {
+            // É telefone - preencher campo de telefone
+            const phoneInput = document.getElementById('reg-phone');
+            phoneInput.value = input;
+            applyPhoneMask(phoneInput);
+        } else {
+            // Se não conseguir detectar, preencher no documento mesmo
+            regDocument.value = input;
+        }
+    }
+
+    // Mostrar modal
+    registerModal.classList.remove('hidden');
+    setTimeout(() => {
+        registerModal.classList.add('show');
+    }, 10);
+}
+
+// Função para abrir modal de edição com dados do cliente
+async function showEditModal(customer) {
+    if (!customer) {
+        showNotification('Nenhum cliente selecionado', 'error');
+        return;
+    }
+
+    // Mostrar loading
+    showNotification('Buscando dados do cliente...', 'info');
+
+    // Buscar dados completos do cliente
+    const cpf = customer.cpf || customer.document;
+    const telefone = customer.telefone || customer.phone;
+
+    const result = await getCustomerData(cpf, telefone);
+
+    if (!result.success) {
+        showNotification(result.message || 'Erro ao buscar dados do cliente', 'error');
+        return;
+    }
+
+    const clientData = result.data;
+
+    // Abrir modal em modo de edição
+    showRegisterModal('', 'edit');
+
+    // Preencher os campos do formulário com os dados completos da API
+    document.getElementById('reg-name').value = clientData.nome || '';
+
+    // Preencher documento (CPF)
+    if (clientData.documento) {
+        document.getElementById('reg-document').value = formatCPF(clientData.documento);
+    }
+
+    // Preencher telefone formatado
+    if (clientData.telefone) {
+        const phoneInput = document.getElementById('reg-phone');
+        phoneInput.value = clientData.telefone;
+        applyPhoneMask(phoneInput);
+    }
+
+    // Preencher e-mail (se for apenas "@", deixar vazio)
+    const email = clientData.email || '';
+    document.getElementById('reg-email').value = email.trim() === '@' ? '' : email;
+
+    // Preencher sexo (se tiver)
+    if (clientData.sexo) {
+        const genderRadio = document.querySelector(`input[name="gender"][value="${clientData.sexo}"]`);
+        if (genderRadio) {
+            genderRadio.checked = true;
+        }
+    }
+
+    // Preencher data de nascimento (se tiver)
+    if (clientData.data_nascimento) {
+        const birthdateInput = document.getElementById('reg-birthdate');
+        // Converter de YYYY-MM-DDTHH:mm:ss para DD/MM/YYYY
+        const dateStr = clientData.data_nascimento.split('T')[0]; // Pega apenas YYYY-MM-DD
+        const [year, month, day] = dateStr.split('-');
+        birthdateInput.value = `${day}/${month}/${year}`;
+    }
+
+    showNotification('Dados do cliente carregados', 'success');
+}
+
+// Função para fechar modal de cadastro
+function closeRegisterModal() {
+    registerModal.classList.remove('show');
+    setTimeout(() => {
+        registerModal.classList.add('hidden');
+        // Limpar formulário
+        registerForm.reset();
+        // Resetar para modo de criação
+        document.getElementById('modal-mode').value = 'create';
+        document.getElementById('modal-title').textContent = 'Cadastrar Cliente';
+        document.getElementById('btn-submit-register').textContent = 'Cadastrar Cliente';
+    }, 300);
+}
+
+// Função para mostrar modal de histórico
+function showHistoryModal(client) {
+    if (!client) {
+        showNotification('Selecione um cliente primeiro', 'error');
+        return;
+    }
+
+    // Preencher dados do cliente
+    document.getElementById('history-client-name').textContent = client.name;
+    document.getElementById('history-points').textContent = formatPoints(client.points);
+    document.getElementById('history-points-expire').textContent = formatPoints(client.pointsToExpire || 0);
+    document.getElementById('history-cashback').textContent = formatCurrency(client.cashback);
+
+    // Preencher produtos
+    const productsGrid = document.getElementById('products-grid');
+    const noProducts = document.getElementById('no-products');
+
+    productsGrid.innerHTML = '';
+
+    if (client.products && client.products.length > 0) {
+        noProducts.classList.add('hidden');
+
+        client.products.forEach(product => {
+            const productCard = document.createElement('div');
+            productCard.className = 'product-card';
+
+            productCard.innerHTML = `
+                <img src="${product.foto || 'https://via.placeholder.com/250x180?text=Sem+Imagem'}"
+                     alt="${product.nome}"
+                     class="product-image"
+                     onerror="this.src='https://via.placeholder.com/250x180?text=Sem+Imagem'">
+                <div class="product-info">
+                    <div class="product-name">${product.nome}</div>
+                    ${product.descricao ? `<div class="product-description">${product.descricao}</div>` : ''}
+                    <div class="product-points">
+                        <span class="product-points-label">Pontos necessários:</span>
+                        <span class="product-points-value">${formatPoints(product.pontos)}</span>
+                    </div>
+                </div>
+            `;
+
+            productsGrid.appendChild(productCard);
+        });
+    } else {
+        noProducts.classList.remove('hidden');
+    }
+
+    // Mostrar modal
+    historyModal.classList.remove('hidden');
+    setTimeout(() => {
+        historyModal.classList.add('show');
+    }, 10);
+}
+
+// Função para fechar modal de histórico
+function closeHistoryModal() {
+    historyModal.classList.remove('show');
+    setTimeout(() => {
+        historyModal.classList.add('hidden');
+    }, 300);
+}
+
+// Função para mostrar modal de sucesso
+function showSuccessModal(data) {
+    const { purchaseValue, pointsEarned, customerName, currentPoints } = data;
+
+    // Preencher dados
+    document.getElementById('success-value').textContent = formatCurrency(purchaseValue);
+    document.getElementById('success-points-earned').textContent = formatPoints(pointsEarned) + ' pontos';
+    document.getElementById('success-current-points').textContent = formatPoints(currentPoints) + ' pontos';
+    document.getElementById('success-client-name').textContent = customerName.toUpperCase();
+
+    // Mostrar modal
+    successModal.classList.remove('hidden');
+    setTimeout(() => {
+        successModal.classList.add('show');
+    }, 10);
+}
+
+// Função para fechar modal de sucesso
+function closeSuccessModal() {
+    successModal.classList.remove('show');
+    setTimeout(() => {
+        successModal.classList.add('hidden');
+    }, 300);
+}
+
+// Função para mostrar notificação
+function showNotification(message, type = 'success') {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.className = `notification ${type}`;
+    notification.classList.add('show');
+
+    setTimeout(() => {
+        notification.classList.remove('show');
+    }, 3000);
+}
+
+// Event Listeners
+
+// Buscar cliente ao clicar no botão
+searchBtn.addEventListener('click', async () => {
+    const query = cpfInput.value.trim();
+
+    if (!query) {
+        showNotification('Digite um CPF ou telefone para buscar', 'error');
+        return;
+    }
+
+    const cleaned = cleanInput(query);
+
+    if (cleaned.length < 3) {
+        showNotification('Digite pelo menos 3 dígitos', 'error');
+        return;
+    }
+
+    // Mostrar loading
+    searchBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" opacity="0.3"/></svg> Buscando...';
+    searchBtn.disabled = true;
+
+    try {
+        const clients = await searchClients(query);
+
+        if (clients.length > 0) {
+            // Cliente encontrado
+            selectCustomer(clients[0]);
+            showNotification('Cliente encontrado!', 'success');
+        } else {
+            // Cliente não encontrado
+            showNotFoundSidebar(cleaned);
+            showNotification('Cliente não encontrado', 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao buscar cliente', 'error');
+    } finally {
+        // Restaurar botão
+        searchBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM18 18l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Buscar Clientes';
+        searchBtn.disabled = false;
+    }
+});
+
+// Buscar ao pressionar Enter no campo CPF
+cpfInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        searchBtn.click();
+    }
+});
+
+// Buscar automaticamente quando campo estiver completo (11 dígitos)
+cpfInput.addEventListener('input', async (e) => {
+    const query = e.target.value;
+    const cleaned = cleanInput(query);
+
+    // Se tiver exatamente 11 dígitos, buscar automaticamente
+    if (cleaned.length === 11) {
+        searchBtn.click();
+    }
+});
+
+// Botões de fechar sidebars
+closeNotFound.addEventListener('click', closeSidebarNotFound);
+closeIdentified.addEventListener('click', closeSidebarIdentified);
+
+// Botão para abrir modal de cadastro do sidebar "não encontrado"
+btnOpenRegister.addEventListener('click', () => {
+    closeSidebarNotFound();
+    showRegisterModal(searchedInput);
+});
+
+// Botão "Cadastrar Cliente" da tela principal
+registerClientBtn.addEventListener('click', () => {
+    const input = cleanInput(cpfInput.value);
+    showRegisterModal(input);
+});
+
+// Botão "Editar Cadastro" do sidebar identificado
+btnEditCustomer.addEventListener('click', () => {
+    if (selectedCustomer) {
+        showEditModal(selectedCustomer);
+    }
+});
+
+// Botões do modal de cadastro
+closeRegisterModalBtn.addEventListener('click', closeRegisterModal);
+btnCancelRegister.addEventListener('click', closeRegisterModal);
+
+// Fechar modal de cadastro ao clicar fora
+registerModal.addEventListener('click', (e) => {
+    if (e.target === registerModal) {
+        closeRegisterModal();
+    }
+});
+
+// Botão "Histórico do Cliente"
+historyClientBtn.addEventListener('click', () => {
+    if (selectedCustomer) {
+        showHistoryModal(selectedCustomer);
+    } else {
+        showNotification('Busque e selecione um cliente primeiro', 'error');
+    }
+});
+
+// Botões do modal de histórico
+closeHistoryModalBtn.addEventListener('click', closeHistoryModal);
+
+// Fechar modal de histórico ao clicar fora
+historyModal.addEventListener('click', (e) => {
+    if (e.target === historyModal) {
+        closeHistoryModal();
+    }
+});
+
+// Botão do modal de sucesso
+btnCloseSuccess.addEventListener('click', closeSuccessModal);
+
+// Fechar modal de sucesso ao clicar fora
+successModal.addEventListener('click', (e) => {
+    if (e.target === successModal) {
+        closeSuccessModal();
+    }
+});
+
+// Função para cadastrar consumidor
+async function registerConsumer(data) {
+    try {
+        console.log('Enviando cadastro:', data);
+
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.registerClient}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro na API: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        console.log('Resposta do cadastro:', result);
+
+        // Verificar se o cadastro foi bem sucedido
+        if (result && result.CodigoResposta === 100) {
+            return {
+                success: true,
+                message: result.Mensagem || 'Cliente cadastrado com sucesso!',
+                data: result
+            };
+        } else {
+            return {
+                success: false,
+                message: result.MensagemErro || result.Mensagem || 'Erro ao cadastrar cliente',
+                data: result
+            };
+        }
+    } catch (error) {
+        console.error('Erro ao cadastrar consumidor:', error);
+        return {
+            success: false,
+            message: 'Erro ao conectar com o servidor',
+            error: error
+        };
+    }
+}
+
+// Função para atualizar consumidor
+async function updateConsumer(data) {
+    try {
+        console.log('Enviando atualização:', data);
+
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.updateClient}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro na API: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        console.log('Resposta da atualização:', result);
+
+        // Verificar se a atualização foi bem sucedida
+        if (result && result.CodigoResposta === 100) {
+            return {
+                success: true,
+                message: result.Mensagem || 'Cliente atualizado com sucesso!',
+                data: result
+            };
+        } else {
+            return {
+                success: false,
+                message: result.MensagemErro || result.Mensagem || 'Erro ao atualizar cliente',
+                data: result
+            };
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar consumidor:', error);
+        return {
+            success: false,
+            message: 'Erro ao conectar com o servidor',
+            error: error
+        };
+    }
+}
+
+// Função para buscar dados completos do cliente
+async function getCustomerData(cpf, telefone) {
+    try {
+        console.log('Buscando dados completos do cliente:', { cpf, telefone });
+
+        const requestBody = {};
+        if (cpf) requestBody.cpf = cpf;
+        if (telefone) requestBody.telefone = telefone;
+
+        const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.getClientData}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erro na API: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        console.log('Resposta RetornaDadosCliente:', result);
+
+        // Verificar se a busca foi bem sucedida
+        if (result && result.CodigoResposta === 100) {
+            return {
+                success: true,
+                data: result
+            };
+        } else {
+            return {
+                success: false,
+                message: result.MensagemErro || 'Erro ao buscar dados do cliente',
+                data: result
+            };
+        }
+    } catch (error) {
+        console.error('Erro ao buscar dados do cliente:', error);
+        return {
+            success: false,
+            message: 'Erro ao conectar com o servidor',
+            error: error
+        };
+    }
+}
+
+// Função para formatar telefone para (XX)XXXXX-XXXX
+function formatPhoneForAPI(phone) {
+    const cleaned = cleanInput(phone);
+    if (cleaned.length === 11) {
+        // Formato: (XX)9XXXX-XXXX
+        return `(${cleaned.substring(0, 2)})${cleaned.substring(2, 7)}-${cleaned.substring(7, 11)}`;
+    } else if (cleaned.length === 10) {
+        // Formato: (XX)XXXX-XXXX
+        return `(${cleaned.substring(0, 2)})${cleaned.substring(2, 6)}-${cleaned.substring(6, 10)}`;
+    }
+    return cleaned;
+}
+
+// Função para formatar data - agora já está no formato DD/MM/YYYY
+function formatDateForAPI(dateString) {
+    if (!dateString) return '';
+    // Remove qualquer caractere que não seja número ou barra
+    return dateString.replace(/[^\d\/]/g, '');
+}
+
+// Função para aplicar máscara de data DD/MM/YYYY
+function applyDateMask(input) {
+    let value = input.value.replace(/\D/g, ''); // Remove tudo que não é número
+
+    if (value.length >= 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2);
+    }
+    if (value.length >= 5) {
+        value = value.substring(0, 5) + '/' + value.substring(5, 9);
+    }
+
+    input.value = value;
+}
+
+// Função para aplicar máscara de telefone (XX) XXXXX-XXXX ou (XX) XXXX-XXXX
+function applyPhoneMask(input) {
+    let value = input.value.replace(/\D/g, ''); // Remove tudo que não é número
+
+    if (value.length <= 10) {
+        // Telefone fixo: (XX) XXXX-XXXX
+        if (value.length > 6) {
+            value = '(' + value.substring(0, 2) + ') ' + value.substring(2, 6) + '-' + value.substring(6, 10);
+        } else if (value.length > 2) {
+            value = '(' + value.substring(0, 2) + ') ' + value.substring(2);
+        } else if (value.length > 0) {
+            value = '(' + value;
+        }
+    } else {
+        // Telefone celular: (XX) XXXXX-XXXX
+        value = '(' + value.substring(0, 2) + ') ' + value.substring(2, 7) + '-' + value.substring(7, 11);
+    }
+
+    input.value = value;
+}
+
+// Função para aplicar máscara de moeda R$ X.XXX,XX
+function applyMoneyMask(input) {
+    let value = input.value.replace(/\D/g, ''); // Remove tudo que não é número
+
+    // Se não tiver valor, limpa o campo
+    if (value === '') {
+        input.value = '';
+        return;
+    }
+
+    // Converte para número e divide por 100 para ter os centavos
+    value = (parseInt(value) / 100).toFixed(2);
+
+    // Formata para o padrão brasileiro
+    value = value.replace('.', ',');
+    value = value.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+
+    input.value = 'R$ ' + value;
+}
+
+// Função para extrair valor numérico de uma string com máscara de moeda
+function extractMoneyValue(maskedValue) {
+    // Remove R$, pontos e troca vírgula por ponto
+    const cleanValue = maskedValue.replace(/[R$\s.]/g, '').replace(',', '.');
+    return parseFloat(cleanValue) || 0;
+}
+
+// Submit do formulário de cadastro
+registerForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const mode = document.getElementById('modal-mode').value;
+    const nome = document.getElementById('reg-name').value.trim();
+    const documento = cleanInput(document.getElementById('reg-document').value);
+    const sexo = document.querySelector('input[name="gender"]:checked')?.value;
+    const nascimento = document.getElementById('reg-birthdate').value;
+    const email = document.getElementById('reg-email').value.trim();
+    const telefone = cleanInput(document.getElementById('reg-phone').value);
+   
+
+    // Validação básica
+    if (!nome) {
+        showNotification('Digite o nome do cliente', 'error');
+        return;
+    }
+
+    if (!telefone) {
+        showNotification('Digite o telefone do cliente', 'error');
+        return;
+    }
+
+    // Preparar dados para API
+    const requestData = {
+        nome: nome
+    };
+
+    if (documento) requestData.cpf = documento;
+    if (sexo) requestData.sexo = sexo;
+    if (nascimento) requestData.nascimento = formatDateForAPI(nascimento);
+    if (email && !noEmail) requestData.email = email;
+    if (telefone) requestData.telefone = formatPhoneForAPI(telefone);
+
+    console.log(`Dados do ${mode === 'edit' ? 'atualização' : 'cadastro'}:`, requestData);
+
+    // Desabilitar botão durante o processo
+    const submitBtn = registerForm.querySelector('.btn-submit');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = mode === 'edit' ? 'Atualizando...' : 'Cadastrando...';
+
+    try {
+        // Chamar API apropriada de acordo com o modo
+        const result = mode === 'edit'
+            ? await updateConsumer(requestData)
+            : await registerConsumer(requestData);
+
+        if (result.success) {
+            showNotification(result.message, 'success');
+            closeRegisterModal();
+
+            if (mode === 'create') {
+                // Buscar o cliente recém-cadastrado automaticamente
+                // Prioriza CPF se tiver, senão usa telefone
+                const searchQuery = documento || telefone;
+
+                if (searchQuery) {
+                    // Aguardar 1 segundo para dar tempo da API processar o cadastro
+                    setTimeout(async () => {
+                        console.log('Buscando cliente recém-cadastrado:', searchQuery);
+
+                        // Buscar o cliente
+                        const clients = await searchClients(searchQuery);
+
+                        if (clients.length > 0) {
+                            // Selecionar o cliente automaticamente
+                            selectCustomer(clients[0]);
+
+                            // Preencher o campo de CPF/telefone na tela principal
+                            if (documento) {
+                                cpfInput.value = formatCPF(documento);
+                            } else {
+                                cpfInput.value = requestData.telefone;
+                            }
+
+                            showNotification('Cliente cadastrado e selecionado! Pronto para pontuar.', 'success');
+                        } else {
+                            showNotification('Cliente cadastrado! Busque novamente para pontuar.', 'success');
+                        }
+                    }, 1000);
+                }
+            } else {
+                // Modo de edição - atualizar os dados do cliente selecionado
+                if (selectedCustomer) {
+                    // Buscar novamente o cliente para pegar os dados atualizados
+                    const searchQuery = documento || telefone;
+
+                    setTimeout(async () => {
+                        console.log('Buscando dados atualizados do cliente:', searchQuery);
+
+                        const clients = await searchClients(searchQuery);
+
+                        if (clients.length > 0) {
+                            selectCustomer(clients[0]);
+                            showNotification('Cliente atualizado com sucesso!', 'success');
+                        }
+                    }, 500);
+                }
+            }
+        } else {
+            showNotification(result.message, 'error');
+            console.error(`Erro no ${mode === 'edit' ? 'atualização' : 'cadastro'}:`, result);
+        }
+    } catch (error) {
+        showNotification(`Erro ao ${mode === 'edit' ? 'atualizar' : 'cadastrar'} cliente`, 'error');
+        console.error('Erro:', error);
+    } finally {
+        // Restaurar botão
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+});
+
+// Botão "Cadastrar e Pontuar"
+registerScoreBtn.addEventListener('click', async () => {
+    if (!selectedCustomer) {
+        showNotification('Selecione um cliente válido', 'error');
+        return;
+    }
+
+    // Extrair valor numérico da máscara de moeda
+    const value = extractMoneyValue(valueInput.value);
+    if (!value || value <= 0) {
+        showNotification('Digite um valor válido', 'error');
+        return;
+    }
+
+    // Desabilitar botão durante o processo
+    registerScoreBtn.disabled = true;
+    registerScoreBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" opacity="0.3"/></svg> Pontuando...';
+
+    try {
+        // Chamar API para pontuar
+        const result = await addPointsToCustomer(selectedCustomer, value);
+
+        if (result.success) {
+            // Guardar saldo anterior para calcular pontos ganhos
+            const previousPoints = selectedCustomer.points;
+
+            // Atualizar com dados da API de pontuação
+            // A API retorna: saldo, cashback, pontos_expirar
+            if (result.data.saldo !== undefined) {
+                selectedCustomer.points = result.data.saldo;
+            }
+
+    
+
+            if (result.data.pontos_expirar !== undefined) {
+                selectedCustomer.pointsToExpire = result.data.pontos_expirar;
+            }
+
+            // Calcular pontos ganhos
+            const pointsEarned = selectedCustomer.points - previousPoints;
+
+
+            // Atualizar display no sidebar
+            document.getElementById('identified-points').textContent = formatPoints(selectedCustomer.points);
+
+            // Mostrar modal de sucesso
+            showSuccessModal({
+                purchaseValue: value,
+                pointsEarned: pointsEarned > 0 ? pointsEarned : Math.floor(value),
+                customerName: selectedCustomer.name,
+                currentPoints: selectedCustomer.points,
+                currentCashback: selectedCustomer.cashback
+            });
+
+            // Limpar valor
+            valueInput.value = '';
+
+            console.log(`Pontuação realizada:`, {
+                cliente: selectedCustomer.name,
+                cpf: selectedCustomer.cpf,
+                valor: value,
+                pontosAdicionados: pointsEarned,
+                totalPontos: selectedCustomer.points,
+                resposta: result.data
+            });
+        } else {
+            // Mostrar erro
+            showNotification(result.message, 'error');
+            console.error('Erro na pontuação:', result);
+        }
+    } catch (error) {
+        showNotification('Erro ao pontuar cliente', 'error');
+        console.error('Erro:', error);
+    } finally {
+        // Restaurar botão
+        registerScoreBtn.disabled = false;
+        registerScoreBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2v16M2 10h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Cadastrar e Pontuar';
+    }
+});
+
+// Formatação automática do CPF no campo de entrada
+cpfInput.addEventListener('blur', () => {
+    const value = cpfInput.value;
+    const cleaned = cleanInput(value);
+
+    if (cleaned.length === 11 && detectInputType(value) === 'cpf') {
+        cpfInput.value = formatCPF(cleaned);
+    }
+});
+
+// Aplicar máscara de data no campo de nascimento
+const birthdateInput = document.getElementById('reg-birthdate');
+birthdateInput.addEventListener('input', (e) => {
+    applyDateMask(e.target);
+});
+
+// Aplicar máscara de telefone no campo de telefone
+const phoneInput = document.getElementById('reg-phone');
+phoneInput.addEventListener('input', (e) => {
+    applyPhoneMask(e.target);
+});
+
+// Aplicar máscara de moeda no campo de valor da compra
+valueInput.addEventListener('input', (e) => {
+    applyMoneyMask(e.target);
+});
+
+// ==================== SQL SERVER INTEGRATION ====================
+
+// Elementos do DOM para SQL
+const sqlConfigModal = document.getElementById('sql-config-modal');
+const btnOpenSqlConfig = document.getElementById('btn-open-sql-config');
+const closeSqlConfigModalBtn = document.getElementById('close-sql-config-modal');
+const sqlConfigForm = document.getElementById('sql-config-form');
+const btnTestSql = document.getElementById('btn-test-sql');
+
+let lastFetchedValue = null; // Armazena o último valor buscado para evitar duplicatas
+
+// Função para buscar última venda do SQL Server
+async function fetchLastSale() {
+    try {
+        const response = await fetch(`${API_CONFIG.baseUrl}/sql/last-sale`);
+        const result = await response.json();
+
+        if (result.success && result.data.valor) {
+            const valor = result.data.valor;
+
+            // Verificar se o valor mudou desde a última busca
+            if (valor !== lastFetchedValue) {
+                lastFetchedValue = valor;
+
+                // Preencher campo de valor automaticamente
+                valueInput.value = formatCurrency(valor);
+
+                // Habilitar botão de pontuar se tiver cliente selecionado
+                if (selectedCustomer) {
+                    registerScoreBtn.disabled = false;
+                }
+
+                console.log('✅ Última venda buscada:', valor);
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao buscar última venda:', error);
+    }
+}
+
+// Event listener para quando a janela recebe foco
+window.addEventListener('focus', () => {
+    console.log('🔍 Janela recebeu foco, buscando última venda...');
+    fetchLastSale();
+});
+
+// Buscar valor ao carregar a página
+window.addEventListener('load', () => {
+    fetchLastSale();
+    loadSqlConfig();
+});
+
+// Função para carregar configuração SQL e preencher formulário
+async function loadSqlConfig() {
+    try {
+        const response = await fetch(`${API_CONFIG.baseUrl}/sql/config`);
+        const config = await response.json();
+
+        if (config.configured) {
+            document.getElementById('sql-server').value = config.server || 'localhost';
+            document.getElementById('sql-database').value = config.database || '';
+            document.getElementById('sql-user').value = config.user || 'sa';
+            document.getElementById('sql-port').value = config.port || 1433;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar configuração SQL:', error);
+    }
+}
+
+// Função para mostrar modal SQL
+function showSqlConfigModal() {
+    sqlConfigModal.classList.remove('hidden');
+    setTimeout(() => {
+        sqlConfigModal.classList.add('show');
+    }, 10);
+}
+
+// Função para fechar modal SQL
+function closeSqlConfigModal() {
+    sqlConfigModal.classList.remove('show');
+    setTimeout(() => {
+        sqlConfigModal.classList.add('hidden');
+    }, 300);
+}
+
+// Event listeners do modal SQL
+btnOpenSqlConfig.addEventListener('click', showSqlConfigModal);
+closeSqlConfigModalBtn.addEventListener('click', closeSqlConfigModal);
+
+// Fechar modal ao clicar fora
+sqlConfigModal.addEventListener('click', (e) => {
+    if (e.target === sqlConfigModal) {
+        closeSqlConfigModal();
+    }
+});
+
+// Testar conexão SQL
+btnTestSql.addEventListener('click', async () => {
+    const originalText = btnTestSql.textContent;
+    btnTestSql.disabled = true;
+    btnTestSql.textContent = 'Testando...';
+
+    try {
+        const response = await fetch(`${API_CONFIG.baseUrl}/sql/test`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification(result.message, 'success');
+        } else {
+            showNotification(result.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao testar conexão', 'error');
+        console.error('Erro:', error);
+    } finally {
+        btnTestSql.disabled = false;
+        btnTestSql.textContent = originalText;
+    }
+});
+
+// Salvar configuração SQL
+sqlConfigForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const server = document.getElementById('sql-server').value.trim();
+    const database = document.getElementById('sql-database').value.trim();
+    const user = document.getElementById('sql-user').value.trim();
+    const password = document.getElementById('sql-password').value;
+    const port = parseInt(document.getElementById('sql-port').value) || 1433;
+    const query = document.getElementById('sql-query').value.trim();
+
+    if (!database) {
+        showNotification('Digite o nome do banco de dados', 'error');
+        return;
+    }
+
+    const configData = {
+        server,
+        database,
+        user,
+        password,
+        port,
+        query
+    };
+
+    try {
+        const response = await fetch(`${API_CONFIG.baseUrl}/sql/config`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(configData)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification(result.message, 'success');
+            closeSqlConfigModal();
+
+            // Buscar última venda após salvar config
+            setTimeout(() => {
+                fetchLastSale();
+            }, 1000);
+        } else {
+            showNotification(result.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Erro ao salvar configuração', 'error');
+        console.error('Erro:', error);
+    }
+});
