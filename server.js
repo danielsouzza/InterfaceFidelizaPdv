@@ -24,12 +24,52 @@ function loadSqlConfig() {
             const configData = fs.readFileSync(SQL_CONFIG_PATH, 'utf8');
             sqlConfig = JSON.parse(configData);
             console.log('✅ Configuração SQL Server carregada');
+            
+            // Log do tipo de configuração
+            if (sqlConfig.connectionString) {
+                console.log('📝 Usando string de conexão (Integrated Security)');
+            } else {
+                console.log('📝 Usando configuração por campos separados');
+            }
         } else {
             console.log('⚠️  Arquivo sql-config.json não encontrado');
         }
     } catch (error) {
         console.error('❌ Erro ao carregar configuração SQL:', error.message);
     }
+}
+
+// Função para criar configuração de conexão SQL
+function createSqlConnection() {
+    if (!sqlConfig) {
+        throw new Error('Configuração SQL não encontrada');
+    }
+
+    // Modo 1: String de conexão (Windows Integrated Security)
+    if (sqlConfig.connectionString) {
+        return {
+            connectionString: sqlConfig.connectionString,
+            options: sqlConfig.options || {
+                encrypt: true,
+                trustServerCertificate: true,
+                enableArithAbort: true
+            }
+        };
+    }
+
+    // Modo 2: Configuração por campos separados
+    return {
+        server: sqlConfig.server,
+        database: sqlConfig.database,
+        user: sqlConfig.user,
+        password: sqlConfig.password,
+        port: sqlConfig.port,
+        options: sqlConfig.options || {
+            encrypt: true,
+            trustServerCertificate: true,
+            enableArithAbort: true
+        }
+    };
 }
 
 loadSqlConfig();
@@ -319,26 +359,43 @@ app.get('/api/sql/config', (req, res) => {
         return res.json({ configured: false });
     }
 
-    res.json({
+    const response = {
         configured: true,
-        server: sqlConfig.server,
-        database: sqlConfig.database,
-        user: sqlConfig.user,
-        port: sqlConfig.port
-    });
+        mode: sqlConfig.connectionString ? 'connectionString' : 'fields'
+    };
+
+    // Se usando string de conexão
+    if (sqlConfig.connectionString) {
+        // Mascarar informações sensíveis da string de conexão
+        const maskedConnectionString = sqlConfig.connectionString
+            .replace(/Password=[^;]+/i, 'Password=***')
+            .replace(/Pwd=[^;]+/i, 'Pwd=***');
+        
+        response.connectionString = maskedConnectionString;
+    } else {
+        // Configuração por campos separados
+        response.server = sqlConfig.server;
+        response.database = sqlConfig.database;
+        response.user = sqlConfig.user;
+        response.port = sqlConfig.port;
+    }
+
+    res.json(response);
 });
 
 // Rota para salvar configuração SQL
 app.post('/api/sql/config', (req, res) => {
     try {
-        const { server, database, user, password, port, query } = req.body;
+        const { 
+            // Modo campos separados
+            server, database, user, password, port, query,
+            // Modo string de conexão
+            connectionString,
+            // Modo de configuração
+            mode
+        } = req.body;
 
-        const newConfig = {
-            server: server || 'localhost',
-            database: database || '',
-            user: user || 'sa',
-            password: password || '',
-            port: port || 1433,
+        let newConfig = {
             options: {
                 encrypt: true,
                 trustServerCertificate: true,
@@ -349,12 +406,29 @@ app.post('/api/sql/config', (req, res) => {
             }
         };
 
+        // Modo 1: String de conexão (Windows Integrated Security)
+        if (mode === 'connectionString' && connectionString) {
+            newConfig.connectionString = connectionString;
+            console.log('✅ Configuração SQL Server atualizada (String de Conexão)');
+        } 
+        // Modo 2: Campos separados (padrão)
+        else {
+            newConfig.server = server || 'localhost';
+            newConfig.database = database || '';
+            newConfig.user = user || 'sa';
+            newConfig.password = password || '';
+            newConfig.port = port || 1433;
+            console.log('✅ Configuração SQL Server atualizada (Campos Separados)');
+        }
+
         fs.writeFileSync(SQL_CONFIG_PATH, JSON.stringify(newConfig, null, 2));
         sqlConfig = newConfig;
 
-        console.log('✅ Configuração SQL Server atualizada');
-
-        res.json({ success: true, message: 'Configuração salva com sucesso!' });
+        res.json({ 
+            success: true, 
+            message: 'Configuração salva com sucesso!',
+            mode: newConfig.connectionString ? 'connectionString' : 'fields'
+        });
     } catch (error) {
         console.error('❌ Erro ao salvar configuração SQL:', error);
         res.status(500).json({
@@ -375,18 +449,15 @@ app.post('/api/sql/test', async (req, res) => {
             });
         }
 
-        const pool = await sql.connect({
-            server: sqlConfig.server,
-            database: sqlConfig.database,
-            user: sqlConfig.user,
-            password: sqlConfig.password,
-            port: sqlConfig.port,
-            options: sqlConfig.options
-        });
-
+        const connectionConfig = createSqlConnection();
+        const pool = await sql.connect(connectionConfig);
         await pool.close();
 
-        res.json({ success: true, message: 'Conexão estabelecida com sucesso!' });
+        const mode = sqlConfig.connectionString ? 'String de Conexão' : 'Campos Separados';
+        res.json({ 
+            success: true, 
+            message: `Conexão estabelecida com sucesso! (Modo: ${mode})` 
+        });
     } catch (error) {
         console.error('❌ Erro ao testar conexão SQL:', error);
         res.status(500).json({
@@ -407,17 +478,9 @@ app.get('/api/sql/last-sale', async (req, res) => {
             });
         }
 
-        const pool = await sql.connect({
-            server: sqlConfig.server,
-            database: sqlConfig.database,
-            user: sqlConfig.user,
-            password: sqlConfig.password,
-            port: sqlConfig.port,
-            options: sqlConfig.options
-        });
-
+        const connectionConfig = createSqlConnection();
+        const pool = await sql.connect(connectionConfig);
         const result = await pool.request().query(sqlConfig.queries.lastSale);
-
         await pool.close();
 
         if (result.recordset.length > 0) {

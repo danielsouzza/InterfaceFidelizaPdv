@@ -564,6 +564,81 @@ textarea {
     cursor: pointer;
 }
 
+/* Estilos para radio buttons personalizados */
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    font-weight: 400;
+}
+
+.radio-option:hover {
+    border-color: #3b82f6;
+    background-color: #f8fafc;
+}
+
+.radio-option input[type="radio"] {
+    display: none;
+}
+
+.radio-custom {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #d1d5db;
+    border-radius: 50%;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom {
+    border-color: #3b82f6;
+    background-color: #3b82f6;
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 8px;
+    height: 8px;
+    background-color: white;
+    border-radius: 50%;
+}
+
+.radio-option input[type="radio"]:checked ~ span {
+    color: #1f2937;
+    font-weight: 500;
+}
+
+/* Seções de configuração */
+.config-section {
+    transition: all 0.3s ease;
+    opacity: 1;
+    max-height: 1000px;
+    overflow: hidden;
+}
+
+.config-section.hidden {
+    opacity: 0;
+    max-height: 0;
+    margin: 0;
+    padding: 0;
+}
+
 .textarea-label,
 .input-label {
     display: block;

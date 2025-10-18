@@ -286,29 +286,58 @@
                 <h2 class="modal-title">Configuração SQL Server</h2>
 
                 <form id="sql-config-form" class="register-form">
+                    <!-- Seletor de Modo -->
                     <div class="form-group">
-                        <label class="input-label">Servidor</label>
-                        <input type="text" id="sql-server" placeholder="localhost ou 0.0.0.0" value="localhost">
+                        <label class="input-label">Modo de Conexão</label>
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="connection-mode" value="fields" id="mode-fields" checked>
+                                <span class="radio-custom"></span>
+                                Campos Separados (Usuário/Senha)
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="connection-mode" value="connectionString" id="mode-connection-string">
+                                <span class="radio-custom"></span>
+                                String de Conexão (Windows Integrated Security)
+                            </label>
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="input-label">Banco de Dados *</label>
-                        <input type="text" id="sql-database" placeholder="Nome do banco" required>
+                    <!-- Modo Campos Separados -->
+                    <div id="fields-config" class="config-section">
+                        <div class="form-group">
+                            <label class="input-label">Servidor</label>
+                            <input type="text" id="sql-server" placeholder="localhost ou 0.0.0.0" value="localhost">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label">Banco de Dados *</label>
+                            <input type="text" id="sql-database" placeholder="Nome do banco" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label">Usuário</label>
+                            <input type="text" id="sql-user" placeholder="sa" value="sa">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label">Senha</label>
+                            <input type="password" id="sql-password" placeholder="Digite a senha">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="input-label">Porta</label>
+                            <input type="number" id="sql-port" placeholder="1433" value="1433">
+                        </div>
                     </div>
 
-                    <div class="form-group">
-                        <label class="input-label">Usuário</label>
-                        <input type="text" id="sql-user" placeholder="sa" value="sa">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="input-label">Senha</label>
-                        <input type="password" id="sql-password" placeholder="Digite a senha">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="input-label">Porta</label>
-                        <input type="number" id="sql-port" placeholder="1433" value="1433">
+                    <!-- Modo String de Conexão -->
+                    <div id="connection-string-config" class="config-section hidden">
+                        <div class="form-group">
+                            <label class="textarea-label">String de Conexão *</label>
+                            <textarea id="sql-connection-string" placeholder="Server=.\SAMMI;Database=BancoSammi;Integrated Security=True;" rows="3"></textarea>
+                            <small class="form-hint">Exemplo: Server=.\SAMMI;Database=BancoSammi;Integrated Security=True;</small>
+                        </div>
                     </div>
 
                     <div class="form-group">

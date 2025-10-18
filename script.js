@@ -1111,9 +1111,38 @@ const sqlConfigModal = document.getElementById('sql-config-modal');
 const btnOpenSqlConfig = document.getElementById('btn-open-sql-config');
 const closeSqlConfigModalBtn = document.getElementById('close-sql-config-modal');
 const sqlConfigForm = document.getElementById('sql-config-form');
+
+// Elementos dos modos de configuração
+const modeFields = document.getElementById('mode-fields');
+const modeConnectionString = document.getElementById('mode-connection-string');
+const fieldsConfig = document.getElementById('fields-config');
+const connectionStringConfig = document.getElementById('connection-string-config');
 const btnTestSql = document.getElementById('btn-test-sql');
 
 let lastFetchedValue = null; // Armazena o último valor buscado para evitar duplicatas
+
+// Função para alternar entre modos de configuração
+function toggleConfigMode() {
+    if (modeFields.checked) {
+        fieldsConfig.classList.remove('hidden');
+        connectionStringConfig.classList.add('hidden');
+        // Remover required da string de conexão
+        document.getElementById('sql-connection-string').removeAttribute('required');
+        // Adicionar required no banco de dados
+        document.getElementById('sql-database').setAttribute('required', 'required');
+    } else if (modeConnectionString.checked) {
+        fieldsConfig.classList.add('hidden');
+        connectionStringConfig.classList.remove('hidden');
+        // Adicionar required na string de conexão
+        document.getElementById('sql-connection-string').setAttribute('required', 'required');
+        // Remover required do banco de dados
+        document.getElementById('sql-database').removeAttribute('required');
+    }
+}
+
+// Event listeners para mudança de modo
+modeFields.addEventListener('change', toggleConfigMode);
+modeConnectionString.addEventListener('change', toggleConfigMode);
 
 // Função para buscar última venda do SQL Server
 async function fetchLastSale() {
@@ -1163,10 +1192,24 @@ async function loadSqlConfig() {
         const config = await response.json();
 
         if (config.configured) {
-            document.getElementById('sql-server').value = config.server || 'localhost';
-            document.getElementById('sql-database').value = config.database || '';
-            document.getElementById('sql-user').value = config.user || 'sa';
-            document.getElementById('sql-port').value = config.port || 1433;
+            // Verificar qual modo está configurado
+            if (config.mode === 'connectionString') {
+                // Modo string de conexão
+                modeConnectionString.checked = true;
+                modeFields.checked = false;
+                document.getElementById('sql-connection-string').value = config.connectionString || '';
+            } else {
+                // Modo campos separados (padrão)
+                modeFields.checked = true;
+                modeConnectionString.checked = false;
+                document.getElementById('sql-server').value = config.server || 'localhost';
+                document.getElementById('sql-database').value = config.database || '';
+                document.getElementById('sql-user').value = config.user || 'sa';
+                document.getElementById('sql-port').value = config.port || 1433;
+            }
+            
+            // Aplicar o modo correto na interface
+            toggleConfigMode();
         }
     } catch (error) {
         console.error('Erro ao carregar configuração SQL:', error);
@@ -1231,26 +1274,41 @@ btnTestSql.addEventListener('click', async () => {
 sqlConfigForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const server = document.getElementById('sql-server').value.trim();
-    const database = document.getElementById('sql-database').value.trim();
-    const user = document.getElementById('sql-user').value.trim();
-    const password = document.getElementById('sql-password').value;
-    const port = parseInt(document.getElementById('sql-port').value) || 1433;
     const query = document.getElementById('sql-query').value.trim();
+    let configData = { query };
 
-    if (!database) {
-        showNotification('Digite o nome do banco de dados', 'error');
-        return;
+    // Verificar qual modo está selecionado
+    if (modeConnectionString.checked) {
+        // Modo string de conexão
+        const connectionString = document.getElementById('sql-connection-string').value.trim();
+        
+        if (!connectionString) {
+            showNotification('Digite a string de conexão', 'error');
+            return;
+        }
+
+        configData.mode = 'connectionString';
+        configData.connectionString = connectionString;
+    } else {
+        // Modo campos separados
+        const server = document.getElementById('sql-server').value.trim();
+        const database = document.getElementById('sql-database').value.trim();
+        const user = document.getElementById('sql-user').value.trim();
+        const password = document.getElementById('sql-password').value;
+        const port = parseInt(document.getElementById('sql-port').value) || 1433;
+
+        if (!database) {
+            showNotification('Digite o nome do banco de dados', 'error');
+            return;
+        }
+
+        configData.mode = 'fields';
+        configData.server = server;
+        configData.database = database;
+        configData.user = user;
+        configData.password = password;
+        configData.port = port;
     }
-
-    const configData = {
-        server,
-        database,
-        user,
-        password,
-        port,
-        query
-    };
 
     try {
         const response = await fetch(`${API_CONFIG.baseUrl}/sql/config`, {
