@@ -1098,3 +1098,427 @@ textarea {
         grid-template-columns: 1fr;
     }
 }
+
+/* ==================== MODAL DE CONFLITO DE PONTUAÇÃO PENDENTE ==================== */
+
+.modal-warning {
+    max-width: 600px;
+    text-align: center;
+}
+
+.warning-icon {
+    margin: 0 auto 20px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
+}
+
+.warning-title {
+    color: #ff9800;
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+}
+
+.warning-details {
+    text-align: left;
+    padding: 20px;
+    background: #fff9f0;
+    border-radius: 12px;
+    border: 2px solid #ffe0b2;
+    margin-bottom: 25px;
+}
+
+.warning-text {
+    font-size: 1.1rem;
+    color: #333;
+    margin-bottom: 20px;
+    line-height: 1.6;
+}
+
+.warning-text strong {
+    color: #ff9800;
+}
+
+.conflito-info {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    border-left: 4px solid #ff9800;
+}
+
+.conflito-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.conflito-item:last-child {
+    border-bottom: none;
+}
+
+.conflito-label {
+    font-weight: 600;
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.conflito-value {
+    font-weight: 700;
+    color: #333;
+    font-size: 1.05rem;
+}
+
+.warning-message {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px dashed #ffe0b2;
+}
+
+.warning-message p {
+    margin-bottom: 12px;
+    font-size: 1rem;
+    color: #333;
+}
+
+.warning-alert {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 12px;
+    color: #856404;
+    font-size: 0.95rem;
+    margin-top: 15px;
+}
+
+.warning-alert strong {
+    color: #d32f2f;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.btn-cancel,
+.btn-confirm-danger {
+    flex: 1;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-cancel {
+    background: #f5f5f5;
+    color: #666;
+    border: 2px solid #ddd;
+}
+
+.btn-cancel:hover {
+    background: #e0e0e0;
+    border-color: #999;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.btn-confirm-danger {
+    background: linear-gradient(135deg, #ff5722 0%, #f44336 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+}
+
+.btn-confirm-danger:hover {
+    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(244, 67, 54, 0.4);
+}
+
+.btn-cancel svg,
+.btn-confirm-danger svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Responsividade do modal de conflito */
+@media (max-width: 768px) {
+    .modal-warning {
+        max-width: 95%;
+        padding: 20px;
+    }
+
+    .warning-title {
+        font-size: 1.4rem;
+    }
+
+    .warning-text {
+        font-size: 1rem;
+    }
+
+    .modal-buttons {
+        flex-direction: column;
+    }
+
+    .btn-cancel,
+    .btn-confirm-danger {
+        width: 100%;
+    }
+}
+
+
+/* ==================== INDICADOR DE PONTUAÇÕES PENDENTES ==================== */
+
+.pendentes-indicator {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1500;
+    font-weight: 600;
+    font-size: 0.95rem;
+    animation: pulse-indicator 2s ease-in-out infinite;
+}
+
+.pendentes-indicator:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(255, 152, 0, 0.6);
+}
+
+.pendentes-indicator svg {
+    animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes pulse-indicator {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 6px 20px rgba(255, 152, 0, 0.6);
+    }
+}
+
+.pendentes-indicator.hidden {
+    display: none;
+}
+
+#pendentes-count {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+/* ==================== MODAL DE PONTUAÇÕES PENDENTES ==================== */
+
+.pendentes-header {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+}
+
+.pendentes-description {
+    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.btn-processar-agora {
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.btn-processar-agora:hover {
+    background: linear-gradient(135deg, #45a049 0%, #388e3c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+.pendentes-list {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 10px 0;
+}
+
+.pendente-item {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.pendente-item:hover {
+    border-color: #ff9800;
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+}
+
+.pendente-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 15px;
+}
+
+.pendente-nota {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #333;
+}
+
+.pendente-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.badge-tentativas {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-erro {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.pendente-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.detail-label {
+    font-size: 0.85rem;
+    color: #999;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.detail-value {
+    font-size: 1rem;
+    color: #333;
+    font-weight: 500;
+}
+
+.pendente-erro {
+    margin-top: 15px;
+    padding: 12px;
+    background: #fff3f3;
+    border-left: 4px solid #f44336;
+    border-radius: 6px;
+}
+
+.pendente-erro-label {
+    font-size: 0.85rem;
+    color: #d32f2f;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.pendente-erro-text {
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.4;
+}
+
+.pendentes-empty {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.pendentes-empty svg {
+    margin-bottom: 20px;
+}
+
+.pendentes-empty h3 {
+    font-size: 1.5rem;
+    color: #4caf50;
+    margin-bottom: 10px;
+}
+
+.pendentes-empty p {
+    color: #666;
+    font-size: 1rem;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .pendentes-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .btn-processar-agora {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .pendente-details {
+        grid-template-columns: 1fr;
+    }
+}

@@ -356,6 +356,15 @@
 
         <div id="notification" class="notification hidden"></div>
 
+        <!-- Indicador de Pontuações Pendentes -->
+        <div id="pendentes-indicator" class="pendentes-indicator hidden" title="Pontuações aguardando reprocessamento">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M10 6v4l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span id="pendentes-count">0</span>
+        </div>
+
         <!-- Botão flutuante para abrir configurações SQL -->
         <button id="btn-open-sql-config" class="floating-btn" title="Configurar SQL Server">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -364,8 +373,106 @@
                 <path d="M12 2v4m0 12v4M2 12h4m12 0h4" stroke="currentColor" stroke-width="2"/>
             </svg>
         </button>
+
+        <!-- Modal de Conflito de Pontuação Pendente -->
+        <div id="conflito-modal" class="modal hidden">
+            <div class="modal-content modal-warning">
+                <!-- <div class="warning-icon">
+                    <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                        <circle cx="30" cy="30" r="28" stroke="#ff9800" stroke-width="4"/>
+                        <path d="M30 20v16M30 44h.01" stroke="#ff9800" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                </div> -->
+
+        
+
+                <div class="warning-details">
+                    <p class="warning-text">
+                        Esta nota <strong id="conflito-numero-nota"></strong> já está aguardando pontuação para outro cliente:
+                    </p>
+
+                    <div class="conflito-info">
+                        <div class="conflito-item">
+                            <span class="conflito-label">Cliente Anterior:</span>
+                            <span class="conflito-value" id="conflito-cpf-anterior"></span>
+                        </div>
+                        <div class="conflito-item">
+                            <span class="conflito-label">Valor:</span>
+                            <span class="conflito-value" id="conflito-valor-anterior"></span>
+                        </div>
+                        <div class="conflito-item">
+                            <span class="conflito-label">Data:</span>
+                            <span class="conflito-value" id="conflito-data-anterior"></span>
+                        </div>
+                    </div>
+
+                    <div class="warning-message">
+                        <p>
+                            <strong>Deseja CANCELAR a pontuação anterior e pontuar para o cliente atual?</strong>
+                        </p>
+                        <p class="warning-alert">
+                            <strong>ATENÇÃO:</strong> Só confirme se o cliente anterior digitou o CPF/telefone errado!
+                        </p>
+                    </div>
+                </div>
+
+                <div class="modal-buttons">
+                    <button class="btn-cancel" id="btn-conflito-cancelar">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M15 5L5 15M5 5l10 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Cancelar
+                    </button>
+                    <button class="btn-confirm-danger" id="btn-conflito-confirmar">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M16 6L7 15l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Confirmar Substituição
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Pontuações Pendentes -->
+        <div id="pendentes-modal" class="modal hidden">
+            <div class="modal-content modal-large">
+                <button class="modal-close" id="close-pendentes-modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+
+                <h2 class="modal-title">📋 Pontuações Pendentes</h2>
+
+                <div class="pendentes-header">
+                    <p class="pendentes-description">
+                        Estas pontuações falharam e estão aguardando reprocessamento automático.
+                    </p>
+                    <button class="btn-processar-agora" id="btn-processar-agora">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M4 10h12M10 4l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        Processar Todas Agora
+                    </button>
+                </div>
+
+                <div id="pendentes-list" class="pendentes-list">
+                    <!-- Lista será preenchida via JavaScript -->
+                </div>
+
+                <div id="pendentes-empty" class="pendentes-empty hidden">
+                    <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                        <circle cx="40" cy="40" r="35" stroke="#4caf50" stroke-width="4"/>
+                        <path d="M25 40l10 10 20-20" stroke="#4caf50" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                    <h3>Nenhuma pontuação pendente!</h3>
+                    <p>Todas as pontuações foram processadas com sucesso.</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>
+    <script src="pendentes-modal.js"></script>
 </body>
 </html>

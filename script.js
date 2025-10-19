@@ -169,10 +169,11 @@ async function searchClients(query) {
 }
 
 // Função para pontuar consumidor
-async function addPointsToCustomer(customer, purchaseValue, options = {}) {
+async function addPointsToCustomer(customer, purchaseValue, numero_nota, options = {}) {
     try {
         const requestBody = {
-            pontuacao_reais: purchaseValue
+            pontuacao_reais: purchaseValue,
+            numero_nota: numero_nota
         };
 
         // Adicionar CPF ou telefone (obrigatório se cartao não for enviado)
@@ -204,11 +205,13 @@ async function addPointsToCustomer(customer, purchaseValue, options = {}) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            
         });
 
         if (!response.ok) {
-            throw new Error(`Erro na API: ${response.status}`);
+            const errorData = await response.json();
+            throw new Error(`Erro na API: ${errorData.user_message}`);
         }
 
         const data = await response.json();
@@ -233,7 +236,7 @@ async function addPointsToCustomer(customer, purchaseValue, options = {}) {
         console.error('Erro ao pontuar cliente:', error);
         return {
             success: false,
-            message: 'Erro ao conectar com o servidor',
+            message: error,
             error: error
         };
     }
@@ -514,7 +517,7 @@ function showSuccessModal(data) {
     successModal.classList.remove('hidden');
     setTimeout(() => {
         successModal.classList.add('show');
-    }, 10);
+    }, 15);
 }
 
 // Função para fechar modal de sucesso
@@ -1013,11 +1016,57 @@ registerScoreBtn.addEventListener('click', async () => {
 
     // Desabilitar botão durante o processo
     registerScoreBtn.disabled = true;
-    registerScoreBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" opacity="0.3"/></svg> Pontuando...';
+    registerScoreBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" opacity="0.3"/></svg> Verificando...';
 
     try {
+        // ===== VERIFICAR SE A NOTA JÁ ESTÁ PENDENTE COM OUTRO CPF/TELEFONE =====
+        if (currentSaleData && currentSaleData['numero_nota']) {
+            const numeroNota = currentSaleData['numero_nota'];
+            const cpfTelefone = cleanInput(selectedCustomer.cpf || selectedCustomer.telefone || selectedCustomer.phone || '');
+
+            console.log('🔍 Verificando pendências para nota:', numeroNota, 'CPF/Tel:', cpfTelefone);
+
+            const checkResponse = await fetch(`${API_CONFIG.baseUrl}/sql/check-nota-pendente`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    numero_nota: numeroNota,
+                    cpf_telefone: cpfTelefone
+                })
+            });
+
+            const checkData = await checkResponse.json();
+            console.log('📊 Resultado verificação:', checkData);
+
+            // Se tem conflito (nota pendente para OUTRO cliente)
+            if (checkData.success && checkData.conflito) {
+                // Mostrar modal de conflito
+                const confirmou = await mostrarModalConflito(checkData.nota_pendente);
+
+                if (!confirmou) {
+                    // Usuário cancelou
+                    showNotification('Pontuação cancelada pelo usuário', 'info');
+                    registerScoreBtn.disabled = false;
+                    registerScoreBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2v16M2 10h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Cadastrar e Pontuar';
+                    return;
+                }
+
+                // Usuário confirmou - excluir pendente anterior
+                console.log('✅ Usuário confirmou - excluindo pendente anterior');
+                await fetch(`${API_CONFIG.baseUrl}/sql/confirmar-substituir-pendente`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero_nota: numeroNota })
+                });
+            }
+        }
+        // ===== FIM DA VERIFICAÇÃO =====
+
+        // Atualizar texto do botão
+        registerScoreBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" opacity="0.3"/></svg> Pontuando...';
+
         // Chamar API para pontuar
-        const result = await addPointsToCustomer(selectedCustomer, value);
+        const result = await addPointsToCustomer(selectedCustomer, value, currentSaleData['numero_nota']);
 
         if (result.success) {
             // Guardar saldo anterior para calcular pontos ganhos
@@ -1053,6 +1102,24 @@ registerScoreBtn.addEventListener('click', async () => {
 
                     // Salvar nota como usada
                     await saveNotaUsada(numeroNota, value, cpfTelefone);
+
+                    // Marcar pontuação pendente como processada (se existir)
+                    try {
+                        await fetch(`${API_CONFIG.baseUrl}/sql/marcar-pendente-processada`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                numero_nota: numeroNota,
+                                cpf_telefone: cpfTelefone
+                            })
+                        });
+                        console.log(`✅ Pendência removida (se existia) para nota ${numeroNota}`);
+
+                        // Atualizar contador de pendentes
+                        setTimeout(() => atualizarContadorPendentes(), 500);
+                    } catch (error) {
+                        console.warn('Erro ao marcar pendente como processada:', error);
+                    }
 
                     // Limpar dados da venda atual
                     currentSaleData = null;
@@ -1402,4 +1469,144 @@ sqlConfigForm.addEventListener('submit', async (e) => {
         showNotification('Erro ao salvar configuração', 'error');
         console.error('Erro:', error);
     }
+});
+
+// ==================== MODAL DE CONFLITO DE PONTUAÇÃO PENDENTE ====================
+
+function mostrarModalConflito(notaPendente) {
+    console.log('🎨 CHAMOU mostrarModalConflito com:', notaPendente);
+
+    return new Promise((resolve) => {
+        const modal = document.getElementById('conflito-modal');
+        const btnCancelar = document.getElementById('btn-conflito-cancelar');
+        const btnConfirmar = document.getElementById('btn-conflito-confirmar');
+
+        console.log('🎨 Modal encontrado:', modal);
+        console.log('🎨 Botão cancelar:', btnCancelar);
+        console.log('🎨 Botão confirmar:', btnConfirmar);
+
+        if (!modal) {
+            console.error('❌ Modal não encontrado no DOM!');
+            resolve(false);
+            return;
+        }
+
+        // Preencher dados do modal
+        document.getElementById('conflito-numero-nota').textContent = notaPendente.numero_nota;
+        document.getElementById('conflito-cpf-anterior').textContent = formatCPFDisplay(notaPendente.cpf_telefone_anterior);
+        document.getElementById('conflito-valor-anterior').textContent = formatCurrency(notaPendente.valor);
+
+        // Formatar data
+        const dataFormatada = new Date(notaPendente.data_criacao).toLocaleString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        document.getElementById('conflito-data-anterior').textContent = dataFormatada;
+
+        // Mostrar modal
+        modal.classList.remove('hidden');
+
+        // Forçar reflow para garantir que a animação funcione
+        modal.offsetHeight;
+
+        requestAnimationFrame(() => {
+            modal.classList.add('show');
+            console.log('🎨 Modal ABERTO! Classes:', modal.className);
+        });
+
+        // Handler para cancelar
+        function handleCancelar() {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+            btnCancelar.removeEventListener('click', handleCancelar);
+            btnConfirmar.removeEventListener('click', handleConfirmar);
+            resolve(false);
+        }
+
+        // Handler para confirmar
+        function handleConfirmar() {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+            btnCancelar.removeEventListener('click', handleCancelar);
+            btnConfirmar.removeEventListener('click', handleConfirmar);
+            resolve(true);
+        }
+
+        // Adicionar event listeners
+        btnCancelar.addEventListener('click', handleCancelar);
+        btnConfirmar.addEventListener('click', handleConfirmar);
+    });
+}
+
+// Função auxiliar para formatar CPF/telefone para exibição
+function formatCPFDisplay(value) {
+    if (!value) return '';
+
+    const cleaned = value.replace(/\D/g, '');
+
+    // Telefone com DDD (10 ou 11 dígitos começando com DDD válido)
+    if (cleaned.length === 10 || cleaned.length === 11) {
+        const ddd = parseInt(cleaned.substring(0, 2));
+
+        // Verificar se é um DDD válido (11-99)
+        if (ddd >= 11 && ddd <= 99) {
+            // Telefone fixo (10 dígitos)
+            if (cleaned.length === 10) {
+                return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+            }
+
+            // Telefone celular (11 dígitos) - verificar se o 3º dígito é 9
+            if (cleaned.length === 11 && cleaned[2] === '9') {
+                return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+            }
+        }
+    }
+
+    // CPF (11 dígitos que NÃO é telefone)
+    if (cleaned.length === 11) {
+        return cleaned.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    }
+
+    // Se for 10 dígitos e não passou no teste de DDD, retorna como está
+    return value;
+}
+
+// ==================== INDICADOR DE PONTUAÇÕES PENDENTES ====================
+
+// Atualizar contador de pendentes a cada 30 segundos
+async function atualizarContadorPendentes() {
+    try {
+        const response = await fetch(`${API_CONFIG.baseUrl}/sql/pontuacoes-pendentes`);
+        const data = await response.json();
+
+        const indicator = document.getElementById("pendentes-indicator");
+        const countElement = document.getElementById("pendentes-count");
+
+        if (data.success && data.count > 0) {
+            countElement.textContent = data.count;
+            indicator.classList.remove("hidden");
+        } else {
+            indicator.classList.add("hidden");
+        }
+    } catch (error) {
+        console.error("Erro ao atualizar contador de pendentes:", error);
+    }
+}
+
+// Iniciar atualização automática
+setInterval(atualizarContadorPendentes, 30000); // A cada 30 segundos
+
+// Atualizar ao carregar a página
+setTimeout(atualizarContadorPendentes, 2000);
+
+// Clicar no indicador para abrir modal de pendentes
+document.getElementById("pendentes-indicator")?.addEventListener("click", async () => {
+    await abrirModalPendentes();
 });
