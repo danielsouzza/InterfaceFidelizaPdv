@@ -430,7 +430,10 @@ app.post('/api/dados-cliente', async (req, res) => {
 
 // Query para buscar última venda (pode ser personalizada via .env se necessário)
 const QUERY_LAST_SALE = process.env.QUERY_LAST_SALE || 'SELECT TOP 1 numero_nota, valor FROM Notas ORDER BY data_nota DESC, id DESC';
-
+console.log('QUERY_LAST_SALE:', QUERY_LAST_SALE);
+console.log('DB_PDV_CONFIG:', DB_PDV_CONFIG);
+console.log('QUERY_LAST_SALE:', QUERY_LAST_SALE);
+console.log('DB_PDV_CONFIG:', DB_PDV_CONFIG);
 // Rota para buscar última venda (do banco PDV)
 app.get('/api/sql/last-sale', async (req, res) => {
     try {
