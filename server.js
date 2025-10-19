@@ -493,7 +493,7 @@ app.get('/api/sql/last-sale', async (req, res) => {
             // Tentar encontrar campo de valor pelos nomes conhecidos (case insensitive)
             for (const fieldName of valorFields) {
                 for (const key in sale) {
-                    if (key.toLowerCase() === fieldName && typeof sale[key] === 'number' && sale[key] > 0) {
+                    if (key.toLowerCase() === fieldName) {
                         valor = sale[key];
                         break;
                     }
