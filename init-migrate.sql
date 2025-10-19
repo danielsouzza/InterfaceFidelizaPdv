@@ -1,10 +1,37 @@
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'NotasUsadas')
+BEGIN
+    CREATE TABLE NotasUsadas (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        numero_nota VARCHAR(50) NOT NULL,
+        valor DECIMAL(10,2) NOT NULL,
+        cpf_telefone VARCHAR(20) NOT NULL,
+        data_uso DATETIME NOT NULL DEFAULT GETDATE(),
+        CONSTRAINT UQ_NotaUsada UNIQUE (numero_nota, cpf_telefone)
+    );
+
+    PRINT 'Tabela NotasUsadas criada com sucesso!';
+END
+ELSE
+BEGIN
+    PRINT 'Tabela NotasUsadas já existe.';
+END
+GO
+
+-- Criar índice para melhorar performance de consultas
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_NotasUsadas_NumeroNota')
+BEGIN
+    CREATE INDEX IX_NotasUsadas_NumeroNota ON NotasUsadas(numero_nota);
+    PRINT 'Índice IX_NotasUsadas_NumeroNota criado!';
+END
+GO
+
 -- Script SQL para criar a tabela PontuacaoPendente
 -- Esta tabela armazena tentativas de pontuação que falharam para reprocessamento automático
 
 -- Verificar se a tabela já existe e criar se não existir
-IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[TesteNotas].[dbo].[PontuacaoPendente]') AND type in (N'U'))
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PontuacaoPendente')
 BEGIN
-    CREATE TABLE [TesteNotas].[dbo].[PontuacaoPendente] (
+    CREATE TABLE PontuacaoPendente (
         [id] INT IDENTITY(1,1) PRIMARY KEY,
         [numero_nota] VARCHAR(50) NOT NULL,
         [valor] DECIMAL(10, 2) NOT NULL,
@@ -18,9 +45,8 @@ BEGIN
     );
 
     -- Criar índices para melhorar performance
-    CREATE INDEX IX_PontuacaoPendente_Processado ON [TesteNotas].[dbo].[PontuacaoPendente] ([processado]);
-    CREATE INDEX IX_PontuacaoPendente_NumeroNota ON [TesteNotas].[dbo].[PontuacaoPendente] ([numero_nota]);
-    CREATE INDEX IX_PontuacaoPendente_DataCriacao ON [TesteNotas].[dbo].[PontuacaoPendente] ([data_criacao]);
+    CREATE INDEX IX_PontuacaoPendente_NumeroNota ON PontuacaoPendente (numero_nota);
+    CREATE INDEX IX_PontuacaoPendente_DataCriacao ON PontuacaoPendente (data_criacao);
 
     PRINT 'Tabela PontuacaoPendente criada com sucesso!';
 END
@@ -29,17 +55,3 @@ BEGIN
     PRINT 'Tabela PontuacaoPendente já existe.';
 END
 GO
-
--- Exemplo de consulta para verificar pontuações pendentes
--- SELECT * FROM PontuacaoPendente WHERE processado = 0 ORDER BY data_criacao DESC;
-
--- Exemplo de consulta para ver histórico completo
--- SELECT * FROM PontuacaoPendente ORDER BY data_criacao DESC;
-
--- Exemplo de consulta para ver estatísticas
--- SELECT
---     COUNT(*) as total,
---     SUM(CASE WHEN processado = 0 THEN 1 ELSE 0 END) as pendentes,
---     SUM(CASE WHEN processado = 1 THEN 1 ELSE 0 END) as processadas,
---     AVG(tentativas) as media_tentativas
--- FROM PontuacaoPendente;

@@ -1,87 +1,62 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
 const sql = require('mssql');
-const fs = require('fs');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // Configuração da API Fidelimax
 const API_CONFIG = {
-    baseUrl: 'https://api.fidelimax.com.br/api/Integracao',
-    authToken: '5e5c32ec-685b-456d-bf8f-a3151bb6a27e-636' // Substitua pelo token real
+    baseUrl: process.env.FIDELIMAX_BASE_URL || 'https://api.fidelimax.com.br/api/Integracao',
+    authToken: process.env.FIDELIMAX_AUTH_TOKEN || '5e5c32ec-685b-456d-bf8f-a3151bb6a27e-636'
 };
 
-// Carregar configuração do SQL Server
-let sqlConfig = null;
-const SQL_CONFIG_PATH = path.join(__dirname, 'sql-config.json');
+// Intervalo de reprocessamento (em minutos)
+const INTERVALO_REPROCESSAMENTO = parseInt(process.env.INTERVALO_REPROCESSAMENTO) || 5;
 
-function loadSqlConfig() {
-    try {
-        if (fs.existsSync(SQL_CONFIG_PATH)) {
-            const configData = fs.readFileSync(SQL_CONFIG_PATH, 'utf8');
-            sqlConfig = JSON.parse(configData);
-            console.log('✅ Configuração SQL Server carregada');
-            
-            // Log do tipo de configuração
-            if (sqlConfig.connectionString) {
-                console.log('📝 Usando string de conexão (Integrated Security)');
-            } else {
-                console.log('📝 Usando configuração por campos separados');
-            }
-        } else {
-            console.log('⚠️  Arquivo sql-config.json não encontrado');
-        }
-    } catch (error) {
-        console.error('❌ Erro ao carregar configuração SQL:', error.message);
+// ========================================
+// CONFIGURAÇÃO DOS BANCOS DE DADOS
+// ========================================
+
+// Banco do PDV (onde busca as notas - somente leitura)
+const DB_PDV_CONFIG = {
+    server: process.env.DB_PDV_SERVER || 'localhost',
+    database: process.env.DB_PDV_DATABASE || 'TesteNotas',
+    user: process.env.DB_PDV_USER || 'SA',
+    password: process.env.DB_PDV_PASSWORD || 'Senha@123',
+    port: parseInt(process.env.DB_PDV_PORT) || 1433,
+    options: {
+        encrypt: false,
+        trustServerCertificate: true,
+        enableArithAbort: true
     }
-}
+};
 
-// Função para criar configuração de conexão SQL
-function createSqlConnection() {
-    if (!sqlConfig) {
-        throw new Error('Configuração SQL não encontrada');
+// Banco da Aplicação (onde ficam NotasUsadas e PontuacaoPendente)
+const DB_APP_CONFIG = {
+    server: process.env.DB_APP_SERVER || 'localhost',
+    database: process.env.DB_APP_DATABASE || 'TesteNotas',
+    user: process.env.DB_APP_USER || 'SA',
+    password: process.env.DB_APP_PASSWORD || 'Senha@123',
+    port: parseInt(process.env.DB_APP_PORT) || 1433,
+    options: {
+        encrypt: false,
+        trustServerCertificate: true,
+        enableArithAbort: true
     }
+};
 
-    // Modo 1: String de conexão (Windows Integrated Security)
-    if (sqlConfig.connectionString) {
-        return {
-            connectionString: sqlConfig.connectionString,
-            options: sqlConfig.options || {
-                encrypt: false,
-                trustServerCertificate: true,
-                enableArithAbort: true
-            }
-        };
-    }
-
-    // Modo 2: Configuração por campos separados
-    return {
-        server: sqlConfig.server,
-        database: sqlConfig.database,
-        user: sqlConfig.user,
-        password: sqlConfig.password,
-        port: sqlConfig.port,
-        options: sqlConfig.options || {
-            encrypt: false,
-            trustServerCertificate: true,
-            enableArithAbort: true
-        }
-    };
-}
-
-loadSqlConfig();
+console.log('✅ Configuração carregada do .env');
+console.log('📊 Banco PDV:', DB_PDV_CONFIG.server, '/', DB_PDV_CONFIG.database);
+console.log('📊 Banco App:', DB_APP_CONFIG.server, '/', DB_APP_CONFIG.database);
 
 // Função auxiliar para salvar pontuação pendente
 async function salvarPontuacaoPendente({ numero_nota, valor, cpf_telefone, erro_mensagem, dados_completos }) {
-    if (!sqlConfig) {
-        throw new Error('Configuração SQL não encontrada');
-    }
-
-    const connectionConfig = createSqlConnection();
-    const pool = await sql.connect(connectionConfig);
+    const pool = await sql.connect(DB_APP_CONFIG);
 
     try {
         // Verificar se já existe pendente com esse número e mesmo CPF/telefone
@@ -258,9 +233,8 @@ app.post('/api/pontuar-cliente', async (req, res) => {
         
         if (!response.ok) {
             // Salvar na tabela de pontuação pendente quando houver erro
-            if (sqlConfig && numero_nota) {
+            if (numero_nota) {
                 try {
-                   
                     await salvarPontuacaoPendente({
                         numero_nota,
                         valor: pontuacao_reais,
@@ -289,7 +263,7 @@ app.post('/api/pontuar-cliente', async (req, res) => {
         console.log('Erro ao pontuar cliente:', req.body.numero_nota);
 
         // Salvar na tabela de pontuação pendente quando houver erro de conexão
-        if (sqlConfig && req.body.numero_nota) {
+        if (req.body.numero_nota) {
             try {
                 await salvarPontuacaoPendente({
                     numero_nota: req.body.numero_nota,
@@ -454,134 +428,14 @@ app.post('/api/dados-cliente', async (req, res) => {
 
 // ==================== ROTAS SQL SERVER ====================
 
-// Rota para obter configuração SQL atual (sem senha)
-app.get('/api/sql/config', (req, res) => {
-    if (!sqlConfig) {
-        return res.json({ configured: false });
-    }
+// Query para buscar última venda (pode ser personalizada via .env se necessário)
+const QUERY_LAST_SALE = process.env.QUERY_LAST_SALE || 'SELECT TOP 1 numero_nota, valor FROM Notas ORDER BY data_nota DESC, id DESC';
 
-    const response = {
-        configured: true,
-        mode: sqlConfig.connectionString ? 'connectionString' : 'fields'
-    };
-
-    // Se usando string de conexão
-    if (sqlConfig.connectionString) {
-        // Mascarar informações sensíveis da string de conexão
-        const maskedConnectionString = sqlConfig.connectionString
-            .replace(/Password=[^;]+/i, 'Password=***')
-            .replace(/Pwd=[^;]+/i, 'Pwd=***');
-        
-        response.connectionString = maskedConnectionString;
-    } else {
-        // Configuração por campos separados
-        response.server = sqlConfig.server;
-        response.database = sqlConfig.database;
-        response.user = sqlConfig.user;
-        response.port = sqlConfig.port;
-    }
-
-    res.json(response);
-});
-
-// Rota para salvar configuração SQL
-app.post('/api/sql/config', (req, res) => {
-    try {
-        const { 
-            // Modo campos separados
-            server, database, user, password, port, query,
-            // Modo string de conexão
-            connectionString,
-            // Modo de configuração
-            mode
-        } = req.body;
-
-        let newConfig = {
-            options: {
-                encrypt: false,
-                trustServerCertificate: true,
-                enableArithAbort: true
-            },
-            queries: {
-                lastSale: query || 'S3cr3t@123'
-            }
-        };
-
-        // Modo 1: String de conexão (Windows Integrated Security)
-        if (mode === 'connectionString' && connectionString) {
-            newConfig.connectionString = connectionString;
-            console.log('✅ Configuração SQL Server atualizada (String de Conexão)');
-        } 
-        // Modo 2: Campos separados (padrão)
-        else {
-            newConfig.server = server || '127.0.0.1';
-            newConfig.database = database || 'BancoSammi';
-            newConfig.user = user || 'fideliza';
-            newConfig.password = password || 'S3cr3t@123';
-            newConfig.port = port || 1435;
-            console.log('✅ Configuração SQL Server atualizada (Campos Separados)');
-        }
-
-        fs.writeFileSync(SQL_CONFIG_PATH, JSON.stringify(newConfig, null, 2));
-        sqlConfig = newConfig;
-
-        res.json({ 
-            success: true, 
-            message: 'Configuração salva com sucesso!',
-            mode: newConfig.connectionString ? 'connectionString' : 'fields'
-        });
-    } catch (error) {
-        console.error('❌ Erro ao salvar configuração SQL:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Erro ao salvar configuração',
-            error: error.message
-        });
-    }
-});
-
-// Rota para testar conexão SQL
-app.post('/api/sql/test', async (req, res) => {
-    try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada. Configure primeiro.'
-            });
-        }
-
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
-        await pool.close();
-
-        const mode = sqlConfig.connectionString ? 'String de Conexão' : 'Campos Separados';
-        res.json({ 
-            success: true, 
-            message: `Conexão estabelecida com sucesso! (Modo: ${mode})` 
-        });
-    } catch (error) {
-        console.error('❌ Erro ao testar conexão SQL:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Erro ao conectar ao banco de dados',
-            error: error.message
-        });
-    }
-});
-
-// Rota para buscar última venda
+// Rota para buscar última venda (do banco PDV)
 app.get('/api/sql/last-sale', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
-        const result = await pool.request().query(sqlConfig.queries.lastSale);
+        const pool = await sql.connect(DB_PDV_CONFIG);
+        const result = await pool.request().query(QUERY_LAST_SALE);
         await pool.close();
 
         if (result.recordset.length > 0) {
@@ -631,13 +485,6 @@ app.get('/api/sql/last-sale', async (req, res) => {
 // Rota para verificar se uma nota já foi usada
 app.post('/api/sql/check-nota', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
         const { numero_nota } = req.body;
 
         if (!numero_nota) {
@@ -647,18 +494,7 @@ app.post('/api/sql/check-nota', async (req, res) => {
             });
         }
 
-        const connectionConfig = sqlConfig.connectionString
-            ? { connectionString: sqlConfig.connectionString }
-            : {
-                server: sqlConfig.server,
-                database: sqlConfig.database,
-                user: sqlConfig.user,
-                password: sqlConfig.password,
-                port: sqlConfig.port,
-                options: sqlConfig.options
-            };
-
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         const result = await pool.request()
             .input('numero_nota', sql.VarChar(50), numero_nota)
@@ -686,13 +522,6 @@ app.post('/api/sql/check-nota', async (req, res) => {
 // Rota para salvar nota usada
 app.post('/api/sql/save-nota-usada', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
         const { numero_nota, valor, cpf_telefone } = req.body;
 
         if (!numero_nota || !valor || !cpf_telefone) {
@@ -702,18 +531,7 @@ app.post('/api/sql/save-nota-usada', async (req, res) => {
             });
         }
 
-        const connectionConfig = sqlConfig.connectionString
-            ? { connectionString: sqlConfig.connectionString }
-            : {
-                server: sqlConfig.server,
-                database: sqlConfig.database,
-                user: sqlConfig.user,
-                password: sqlConfig.password,
-                port: sqlConfig.port,
-                options: sqlConfig.options
-            };
-
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         // Verificar se já existe (evitar duplicatas)
         const checkResult = await pool.request()
@@ -761,15 +579,7 @@ app.post('/api/sql/save-nota-usada', async (req, res) => {
 // Rota DEBUG - Listar TODAS as pontuações pendentes (para debug)
 app.get('/api/sql/debug-pendentes', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         const result = await pool.request()
             .query('SELECT * FROM PontuacaoPendente ORDER BY data_criacao DESC');
@@ -794,13 +604,6 @@ app.get('/api/sql/debug-pendentes', async (req, res) => {
 // Rota para verificar se uma nota já está pendente com outro CPF/telefone
 app.post('/api/sql/check-nota-pendente', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
         const { numero_nota, cpf_telefone } = req.body;
 
         console.log('🔍 CHECK-NOTA-PENDENTE chamado:', { numero_nota, cpf_telefone });
@@ -886,13 +689,6 @@ app.post('/api/sql/check-nota-pendente', async (req, res) => {
 // Rota para confirmar e excluir pontuação pendente anterior (usada quando há conflito)
 app.post('/api/sql/confirmar-substituir-pendente', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
         const { numero_nota } = req.body;
 
         if (!numero_nota) {
@@ -931,13 +727,6 @@ app.post('/api/sql/confirmar-substituir-pendente', async (req, res) => {
 // Rota para marcar pontuação pendente como processada (quando pontuar com sucesso)
 app.post('/api/sql/marcar-pendente-processada', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
         const { numero_nota, cpf_telefone } = req.body;
 
         if (!numero_nota) {
@@ -986,15 +775,7 @@ app.post('/api/sql/marcar-pendente-processada', async (req, res) => {
 // Rota para listar pontuações pendentes
 app.get('/api/sql/pontuacoes-pendentes', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         const result = await pool.request()
             .query(`
@@ -1026,15 +807,7 @@ app.get('/api/sql/pontuacoes-pendentes', async (req, res) => {
 // Rota para tentar processar pontuações pendentes manualmente
 app.post('/api/sql/processar-pendentes', async (req, res) => {
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         // Buscar pontuações pendentes
         const pendentes = await pool.request()
@@ -1144,32 +917,15 @@ app.post('/api/sql/processar-pendentes', async (req, res) => {
 
 // Rota para buscar última venda NÃO USADA
 app.get('/api/sql/last-sale-unused', async (req, res) => {
+    let poolPDV = null;
+    let poolAPP = null;
+
     try {
-        if (!sqlConfig) {
-            return res.status(400).json({
-                success: false,
-                message: 'Configuração SQL não encontrada'
-            });
-        }
-
-        const connectionConfig = sqlConfig.connectionString
-            ? { connectionString: sqlConfig.connectionString }
-            : {
-                server: sqlConfig.server,
-                database: sqlConfig.database,
-                user: sqlConfig.user,
-                password: sqlConfig.password,
-                port: sqlConfig.port,
-                options: sqlConfig.options
-            };
-
-        const pool = await sql.connect(connectionConfig);
-
-        // Buscar APENAS a última nota (TOP 1)
-        const result = await pool.request().query(sqlConfig.queries.lastSale);
+        // Buscar do banco PDV
+        poolPDV = await sql.connect(DB_PDV_CONFIG);
+        const result = await poolPDV.request().query(QUERY_LAST_SALE);
 
         if (result.recordset.length === 0) {
-            await pool.close();
             return res.json({
                 success: false,
                 message: 'Nenhuma venda encontrada'
@@ -1187,9 +943,10 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
             }
         }
 
-        // Verificar se a ÚLTIMA nota já foi usada
+        // Verificar se a ÚLTIMA nota já foi usada (no banco APP)
         if (numeroNota) {
-            const checkResult = await pool.request()
+            poolAPP = await sql.connect(DB_APP_CONFIG);
+            const checkResult = await poolAPP.request()
                 .input('numero_nota', sql.VarChar(50), numeroNota)
                 .query('SELECT COUNT(*) as count FROM NotasUsadas WHERE numero_nota = @numero_nota');
 
@@ -1197,7 +954,6 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
 
             if (isUsed) {
                 // Última nota JÁ FOI USADA - retorna vazio
-                await pool.close();
                 return res.json({
                     success: false,
                     message: `Última nota (${numeroNota}) já foi usada`,
@@ -1206,8 +962,6 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
                 });
             }
         }
-
-        await pool.close();
 
         // Extrair valor da última nota (não usada)
         const valorFields = ['valor', 'valor_total', 'total', 'valor_venda', 'preco', 'preco_total'];
@@ -1247,26 +1001,20 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
             message: 'Erro ao buscar última venda',
             error: error.message
         });
+    } finally {
+        if (poolPDV) await poolPDV.close();
+        if (poolAPP) await poolAPP.close();
     }
 });
 
 // ==================== ROTINA AUTOMÁTICA DE REPROCESSAMENTO ====================
-
-// Configuração da rotina (em minutos)
-const INTERVALO_REPROCESSAMENTO = 5; // A cada 5 minutos
 
 // Função para processar pendentes automaticamente
 async function processarPendentesAutomatico() {
     let pool = null;
 
     try {
-        if (!sqlConfig) {
-            console.log('⏭️  Rotina de reprocessamento: SQL não configurado');
-            return;
-        }
-
-        const connectionConfig = createSqlConnection();
-        pool = await sql.connect(connectionConfig);
+        pool = await sql.connect(DB_APP_CONFIG);
 
         // Buscar pontuações pendentes (máximo 5 tentativas)
         const pendentes = await pool.request()
