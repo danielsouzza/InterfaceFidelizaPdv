@@ -487,7 +487,7 @@ app.get('/api/sql/last-sale', async (req, res) => {
             const sale = result.recordset[0];
 
             // Priorizar campos com nomes específicos de valor
-            const valorFields = ['valor', 'valor_total', 'total', 'valor_venda', 'preco', 'preco_total'];
+            const valorFields = ['VLR_TOTAL'];
             let valor = 0;
 
             // Tentar encontrar campo de valor pelos nomes conhecidos (case insensitive)
@@ -501,15 +501,6 @@ app.get('/api/sql/last-sale', async (req, res) => {
                 if (valor > 0) break;
             }
 
-            // Se não encontrou, pega o primeiro campo numérico > 0
-            if (valor === 0) {
-                for (const key in sale) {
-                    if (typeof sale[key] === 'number' && sale[key] > 0) {
-                        valor = sale[key];
-                        break;
-                    }
-                }
-            }
 
             res.json({
                 success: true,
