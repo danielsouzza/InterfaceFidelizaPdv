@@ -1,15 +1,15 @@
 {
-  "server": "0.0.0.0",
-  "database": "TesteNotas",
-  "user": "SA",
-  "password": "Senha@123",
-  "port": 1433,
   "options": {
-    "encrypt": true,
+    "encrypt": false,
     "trustServerCertificate": true,
     "enableArithAbort": true
   },
   "queries": {
     "lastSale": "SELECT TOP 1 numero_nota, valor FROM Notas ORDER BY data_nota DESC, id DESC"
-  }
+  },
+  "server": "localhost",
+  "database": "TesteNotas",
+  "user": "SA",
+  "password": "Senha@123",
+  "port": 1433
 }

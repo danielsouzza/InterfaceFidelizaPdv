@@ -1029,8 +1029,6 @@ registerScoreBtn.addEventListener('click', async () => {
                 selectedCustomer.points = result.data.saldo;
             }
 
-    
-
             if (result.data.pontos_expirar !== undefined) {
                 selectedCustomer.pointsToExpire = result.data.pontos_expirar;
             }
@@ -1038,6 +1036,31 @@ registerScoreBtn.addEventListener('click', async () => {
             // Calcular pontos ganhos
             const pointsEarned = selectedCustomer.points - previousPoints;
 
+            // SALVAR NOTA COMO USADA (se houver dados da venda)
+            if (currentSaleData) {
+                // Encontrar número da nota
+                let numeroNota = null;
+                for (const key in currentSaleData) {
+                    if (key.toLowerCase().includes('numero') || key.toLowerCase().includes('nota')) {
+                        numeroNota = currentSaleData[key];
+                        break;
+                    }
+                }
+
+                if (numeroNota) {
+                    // Pegar CPF ou telefone do cliente
+                    const cpfTelefone = cleanInput(selectedCustomer.cpf || selectedCustomer.telefone || selectedCustomer.phone || '');
+
+                    // Salvar nota como usada
+                    await saveNotaUsada(numeroNota, value, cpfTelefone);
+
+                    // Limpar dados da venda atual
+                    currentSaleData = null;
+                    lastFetchedValue = null; // Resetar controle de valor
+
+                    console.log(`✅ Nota ${numeroNota} salva como usada. Aguardando nova venda no PDV.`);
+                }
+            }
 
             // Atualizar display no sidebar
             document.getElementById('identified-points').textContent = formatPoints(selectedCustomer.points);
@@ -1144,14 +1167,18 @@ function toggleConfigMode() {
 modeFields.addEventListener('change', toggleConfigMode);
 modeConnectionString.addEventListener('change', toggleConfigMode);
 
+// Variável global para armazenar dados da última nota
+let currentSaleData = null;
+
 // Função para buscar última venda do SQL Server
 async function fetchLastSale() {
     try {
-        const response = await fetch(`${API_CONFIG.baseUrl}/sql/last-sale`);
+        const response = await fetch(`${API_CONFIG.baseUrl}/sql/last-sale-unused`);
         const result = await response.json();
 
         if (result.success && result.data.valor) {
             const valor = result.data.valor;
+            currentSaleData = result.data.raw; // Armazenar dados completos da venda
 
             // Verificar se o valor mudou desde a última busca
             if (valor !== lastFetchedValue) {
@@ -1165,11 +1192,50 @@ async function fetchLastSale() {
                     registerScoreBtn.disabled = false;
                 }
 
-                console.log('✅ Última venda buscada:', valor);
+                console.log('✅ Última venda não usada buscada:', valor, currentSaleData);
+            }
+        } else {
+            console.log('⚠️ ', result.message || 'Nenhuma nota disponível');
+            // Limpar valor se a última nota já foi usada
+            if (result.message && result.message.includes('já foi usada')) {
+                valueInput.value = '';
+                currentSaleData = null;
+                lastFetchedValue = null;
+                showNotification(result.message, 'error');
             }
         }
     } catch (error) {
         console.error('Erro ao buscar última venda:', error);
+    }
+}
+
+// Função para salvar nota como usada
+async function saveNotaUsada(numero_nota, valor, cpf_telefone) {
+    try {
+        const response = await fetch(`${API_CONFIG.baseUrl}/sql/save-nota-usada`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                numero_nota: numero_nota,
+                valor: valor,
+                cpf_telefone: cpf_telefone
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            console.log(`✅ Nota ${numero_nota} registrada como usada`);
+            return true;
+        } else {
+            console.error('Erro ao salvar nota:', result.message);
+            return false;
+        }
+    } catch (error) {
+        console.error('Erro ao salvar nota usada:', error);
+        return false;
     }
 }
 

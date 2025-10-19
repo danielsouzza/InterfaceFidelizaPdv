@@ -487,7 +487,7 @@ app.get('/api/sql/last-sale', async (req, res) => {
             const sale = result.recordset[0];
 
             // Priorizar campos com nomes específicos de valor
-            const valorFields = ['VLR_TOTAL','VLR_PRECO_TOTAL'];
+            const valorFields = ['VLR_TOTAL','VLR_PRECO_TOTAL','valor'];
             let valor = 0;
 
             // Tentar encontrar campo de valor pelos nomes conhecidos (case insensitive)
@@ -517,6 +517,244 @@ app.get('/api/sql/last-sale', async (req, res) => {
         }
     } catch (error) {
         console.error('❌ Erro ao buscar última venda:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erro ao buscar última venda',
+            error: error.message
+        });
+    }
+});
+
+// ==================== ROTAS CONTROLE DE NOTAS USADAS ====================
+
+// Rota para verificar se uma nota já foi usada
+app.post('/api/sql/check-nota', async (req, res) => {
+    try {
+        if (!sqlConfig) {
+            return res.status(400).json({
+                success: false,
+                message: 'Configuração SQL não encontrada'
+            });
+        }
+
+        const { numero_nota } = req.body;
+
+        if (!numero_nota) {
+            return res.status(400).json({
+                success: false,
+                message: 'Número da nota é obrigatório'
+            });
+        }
+
+        const connectionConfig = sqlConfig.connectionString
+            ? { connectionString: sqlConfig.connectionString }
+            : {
+                server: sqlConfig.server,
+                database: sqlConfig.database,
+                user: sqlConfig.user,
+                password: sqlConfig.password,
+                port: sqlConfig.port,
+                options: sqlConfig.options
+            };
+
+        const pool = await sql.connect(connectionConfig);
+
+        const result = await pool.request()
+            .input('numero_nota', sql.VarChar(50), numero_nota)
+            .query('SELECT COUNT(*) as count FROM NotasUsadas WHERE numero_nota = @numero_nota');
+
+        await pool.close();
+
+        const isUsed = result.recordset[0].count > 0;
+
+        res.json({
+            success: true,
+            used: isUsed,
+            numero_nota: numero_nota
+        });
+    } catch (error) {
+        console.error('❌ Erro ao verificar nota:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erro ao verificar nota',
+            error: error.message
+        });
+    }
+});
+
+// Rota para salvar nota usada
+app.post('/api/sql/save-nota-usada', async (req, res) => {
+    try {
+        if (!sqlConfig) {
+            return res.status(400).json({
+                success: false,
+                message: 'Configuração SQL não encontrada'
+            });
+        }
+
+        const { numero_nota, valor, cpf_telefone } = req.body;
+
+        if (!numero_nota || !valor || !cpf_telefone) {
+            return res.status(400).json({
+                success: false,
+                message: 'Dados incompletos: numero_nota, valor e cpf_telefone são obrigatórios'
+            });
+        }
+
+        const connectionConfig = sqlConfig.connectionString
+            ? { connectionString: sqlConfig.connectionString }
+            : {
+                server: sqlConfig.server,
+                database: sqlConfig.database,
+                user: sqlConfig.user,
+                password: sqlConfig.password,
+                port: sqlConfig.port,
+                options: sqlConfig.options
+            };
+
+        const pool = await sql.connect(connectionConfig);
+
+        // Verificar se já existe (evitar duplicatas)
+        const checkResult = await pool.request()
+            .input('numero_nota', sql.VarChar(50), numero_nota)
+            .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
+            .query('SELECT id FROM NotasUsadas WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone');
+
+        if (checkResult.recordset.length > 0) {
+            await pool.close();
+            return res.json({
+                success: true,
+                message: 'Nota já estava registrada',
+                already_exists: true
+            });
+        }
+
+        // Inserir nova nota usada
+        await pool.request()
+            .input('numero_nota', sql.VarChar(50), numero_nota)
+            .input('valor', sql.Decimal(10, 2), parseFloat(valor))
+            .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
+            .query('INSERT INTO NotasUsadas (numero_nota, valor, cpf_telefone) VALUES (@numero_nota, @valor, @cpf_telefone)');
+
+        await pool.close();
+
+        console.log(`✅ Nota registrada: ${numero_nota} - Cliente: ${cpf_telefone}`);
+
+        res.json({
+            success: true,
+            message: 'Nota registrada com sucesso',
+            already_exists: false
+        });
+    } catch (error) {
+        console.error('❌ Erro ao salvar nota usada:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Erro ao salvar nota usada',
+            error: error.message
+        });
+    }
+});
+
+// Rota para buscar última venda NÃO USADA
+app.get('/api/sql/last-sale-unused', async (req, res) => {
+    try {
+        if (!sqlConfig) {
+            return res.status(400).json({
+                success: false,
+                message: 'Configuração SQL não encontrada'
+            });
+        }
+
+        const connectionConfig = sqlConfig.connectionString
+            ? { connectionString: sqlConfig.connectionString }
+            : {
+                server: sqlConfig.server,
+                database: sqlConfig.database,
+                user: sqlConfig.user,
+                password: sqlConfig.password,
+                port: sqlConfig.port,
+                options: sqlConfig.options
+            };
+
+        const pool = await sql.connect(connectionConfig);
+
+        // Buscar APENAS a última nota (TOP 1)
+        const result = await pool.request().query(sqlConfig.queries.lastSale);
+
+        if (result.recordset.length === 0) {
+            await pool.close();
+            return res.json({
+                success: false,
+                message: 'Nenhuma venda encontrada'
+            });
+        }
+
+        const lastSale = result.recordset[0];
+        let numeroNota = null;
+
+        // Tentar encontrar campo numero_nota
+        for (const key in lastSale) {
+            if (key.toLowerCase().includes('numero') || key.toLowerCase().includes('nota')) {
+                numeroNota = lastSale[key];
+                break;
+            }
+        }
+
+        // Verificar se a ÚLTIMA nota já foi usada
+        if (numeroNota) {
+            const checkResult = await pool.request()
+                .input('numero_nota', sql.VarChar(50), numeroNota)
+                .query('SELECT COUNT(*) as count FROM NotasUsadas WHERE numero_nota = @numero_nota');
+
+            const isUsed = checkResult.recordset[0].count > 0;
+
+            if (isUsed) {
+                // Última nota JÁ FOI USADA - retorna vazio
+                await pool.close();
+                return res.json({
+                    success: false,
+                    message: `Última nota (${numeroNota}) já foi usada`,
+                    already_used: true,
+                    numero_nota: numeroNota
+                });
+            }
+        }
+
+        await pool.close();
+
+        // Extrair valor da última nota (não usada)
+        const valorFields = ['valor', 'valor_total', 'total', 'valor_venda', 'preco', 'preco_total'];
+        let valor = 0;
+
+        for (const fieldName of valorFields) {
+            for (const key in lastSale) {
+                if (key.toLowerCase() === fieldName && typeof lastSale[key] === 'number' && lastSale[key] > 0) {
+                    valor = lastSale[key];
+                    break;
+                }
+            }
+            if (valor > 0) break;
+        }
+
+        if (valor === 0) {
+            for (const key in lastSale) {
+                if (typeof lastSale[key] === 'number' && lastSale[key] > 0) {
+                    valor = lastSale[key];
+                    break;
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                valor: valor,
+                raw: lastSale
+            },
+            numero_nota: numeroNota || 'não encontrado'
+        });
+    } catch (error) {
+        console.error('❌ Erro ao buscar última venda não usada:', error);
         res.status(500).json({
             success: false,
             message: 'Erro ao buscar última venda',
