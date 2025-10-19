@@ -397,12 +397,12 @@ app.post('/api/sql/config', (req, res) => {
 
         let newConfig = {
             options: {
-                encrypt: true,
+                encrypt: false,
                 trustServerCertificate: true,
                 enableArithAbort: true
             },
             queries: {
-                lastSale: query || 'SELECT TOP 1 numero_nota, valor_total FROM vendas ORDER BY data_venda DESC, id DESC'
+                lastSale: query || 'S3cr3t@123'
             }
         };
 
@@ -413,11 +413,11 @@ app.post('/api/sql/config', (req, res) => {
         } 
         // Modo 2: Campos separados (padrão)
         else {
-            newConfig.server = server || 'localhost';
-            newConfig.database = database || '';
-            newConfig.user = user || 'sa';
-            newConfig.password = password || '';
-            newConfig.port = port || 1433;
+            newConfig.server = server || '127.0.0.1';
+            newConfig.database = database || 'BancoSammi';
+            newConfig.user = user || 'fideliza';
+            newConfig.password = password || 'S3cr3t@123';
+            newConfig.port = port || 1435;
             console.log('✅ Configuração SQL Server atualizada (Campos Separados)');
         }
 
