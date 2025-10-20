@@ -4,7 +4,7 @@
   "description": "Interface para sistema de fidelidade PDV",
   "main": "nw-main.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node launcher.js",
     "dev": "nodemon server.js",
     "nw": "nw .",
     "nw:dev": "nw . --remote-debugging-port=9222",

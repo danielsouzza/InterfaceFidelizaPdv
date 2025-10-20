@@ -1398,19 +1398,29 @@ async function saveNotaUsada(numero_nota, valor, cpf_telefone) {
     }
 }
 
-// Event listener simples para quando a janela recebe foco (versão web)
-if (!isElectron) {
-    window.addEventListener('focus', () => {
-        console.log('🔍 [Web] Janela recebeu foco - buscando última venda...');
-        fetchLastSale();
-    });
-    console.log('✅ Event listener de foco habilitado (versão Web)');
-}
+// ==================== BUSCA AUTOMÁTICA AO FOCAR ====================
+// Funciona SEMPRE - navegador normal, Chrome, Edge, etc.
 
-// Para Electron: o polling inteligente no electron-main.js cuida disso
-if (isElectron) {
-    console.log('ℹ️  Modo Electron: polling inteligente ativo (busca ao voltar para janela)');
-}
+console.log('🔧 Configurando busca automática ao focar...');
+
+// 1. Event listener de FOCO da janela/aba
+window.addEventListener('focus', () => {
+    console.log('🔍 [FOCO] Janela recebeu foco - buscando última venda AUTOMATICAMENTE...');
+    fetchLastSale();
+});
+
+// 2. Page Visibility API - detecta quando ABA fica visível
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        console.log('📄 [VISIBILIDADE] Aba ficou visível - buscando última venda AUTOMATICAMENTE...');
+        fetchLastSale();
+    } else {
+        console.log('👋 Aba ficou oculta');
+    }
+});
+
+console.log('✅ Busca automática AO FOCAR está ATIVA!');
+console.log('ℹ️  Minimize, troque de aba ou Alt+Tab - ao VOLTAR busca automaticamente!');
 
 // ==================== BOTÃO ATUALIZAR + ATALHO F5 ====================
 
