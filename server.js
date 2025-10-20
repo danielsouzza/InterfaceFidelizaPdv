@@ -938,7 +938,7 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
         // Tentar encontrar campo numero_nota
         for (const key in lastSale) {
             if (key.includes('COD_VND_NOTA') || key.toLowerCase().includes('numero') || key.toLowerCase().includes('nota')) {
-                numeroNota = lastSale[key];
+                numeroNota = lastSale[key]+"";
                 break;
             }
         }
