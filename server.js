@@ -950,7 +950,7 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
             console.log('DB_APP_CONFIG:', DB_APP_CONFIG);
             const checkResult = await poolAPP.request()
                 .input('numero_nota', sql.VarChar(50), numeroNota)
-                .query('SELECT COUNT(*) as count FROM [dbo].[NotasUsadas] WHERE numero_nota = @numero_nota');
+                .query('SELECT COUNT(*) as count FROM NotasUsadas WHERE numero_nota = @numero_nota');
 
             const isUsed = checkResult.recordset[0].count > 0;
 
