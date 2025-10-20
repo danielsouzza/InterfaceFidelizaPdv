@@ -65,8 +65,8 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
         height: 900,
-        minWidth: 1200,
-        minHeight: 700,
+        minWidth: 600,  // Reduzido para permitir redimensionamento menor
+        minHeight: 400, // Reduzido para permitir redimensionamento menor
         icon: path.join(__dirname, 'icon.png'), // Adicione um ícone se quiser
         webPreferences: {
             nodeIntegration: false,
@@ -135,6 +135,21 @@ function createWindow() {
     mainWindow.webContents.setWindowOpenHandler(({ url }) => {
         require('electron').shell.openExternal(url);
         return { action: 'deny' };
+    });
+
+    // Adicionar listener de foco para buscar última venda quando a janela receber foco
+    mainWindow.on('focus', () => {
+        console.log('🔍 Janela recebeu foco - buscando última venda...');
+
+        // Executar a função de buscar última venda na página
+        mainWindow.webContents.executeJavaScript(`
+            if (typeof fetchLastSale === 'function') {
+                console.log('🔍 Electron focus event - buscando última venda...');
+                fetchLastSale();
+            }
+        `).catch(err => {
+            console.error('Erro ao executar fetchLastSale:', err);
+        });
     });
 }
 
