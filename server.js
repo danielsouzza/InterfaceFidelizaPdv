@@ -973,7 +973,7 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
         for (const fieldName of valorFields) {
             for (const key in lastSale) {
                 if (key.toLowerCase() == fieldName.toLowerCase()) {
-                    valor = sale[key];
+                    valor = lastSale[key];
                     break;
                 }
             }
