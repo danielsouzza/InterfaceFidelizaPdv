@@ -550,7 +550,7 @@ app.post('/api/sql/save-nota-usada', async (req, res) => {
 
         // Inserir nova nota usada
         await pool.request()
-            .input('numero_nota', sql.VarChar(50), numero_nota)
+            .input('numero_nota', sql.VarChar(50), numero_nota+"")
             .input('valor', sql.Decimal(10, 2), parseFloat(valor))
             .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
             .query('INSERT INTO NotasUsadas (numero_nota, valor, cpf_telefone) VALUES (@numero_nota, @valor, @cpf_telefone)');
@@ -741,7 +741,7 @@ app.post('/api/sql/marcar-pendente-processada', async (req, res) => {
             ? 'UPDATE PontuacaoPendente SET processado = 1, ultima_tentativa = GETDATE() WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone AND processado = 0'
             : 'UPDATE PontuacaoPendente SET processado = 1, ultima_tentativa = GETDATE() WHERE numero_nota = @numero_nota AND processado = 0';
 
-        const request = pool.request().input('numero_nota', sql.VarChar(50), numero_nota);
+        const request = pool.request().input('numero_nota', sql.VarChar(50), numero_nota+"");
 
         if (cpf_telefone) {
             request.input('cpf_telefone', sql.VarChar(20), cpf_telefone);
