@@ -535,7 +535,7 @@ app.post('/api/sql/save-nota-usada', async (req, res) => {
 
         // Verificar se já existe (evitar duplicatas)
         const checkResult = await pool.request()
-            .input('numero_nota', sql.VarChar(50), numero_nota)
+            .input('numero_nota', sql.VarChar(50), numero_nota+"")
             .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
             .query('SELECT id FROM NotasUsadas WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone');
 
@@ -615,8 +615,7 @@ app.post('/api/sql/check-nota-pendente', async (req, res) => {
             });
         }
 
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         // Verificar se existe nota pendente com esse número
         const result = await pool.request()
@@ -698,8 +697,7 @@ app.post('/api/sql/confirmar-substituir-pendente', async (req, res) => {
             });
         }
 
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         // Excluir a pontuação pendente anterior
         await pool.request()
@@ -736,8 +734,7 @@ app.post('/api/sql/marcar-pendente-processada', async (req, res) => {
             });
         }
 
-        const connectionConfig = createSqlConnection();
-        const pool = await sql.connect(connectionConfig);
+        const pool = await sql.connect(DB_APP_CONFIG);
 
         // Marcar como processada (ou deletar se preferir)
         const query = cpf_telefone
