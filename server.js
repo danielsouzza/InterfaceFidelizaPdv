@@ -944,8 +944,10 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
         }
 
         // Verificar se a ÚLTIMA nota já foi usada (no banco APP)
+        console.log('numeroNota:', numeroNota);
         if (numeroNota) {
             poolAPP = await sql.connect(DB_APP_CONFIG);
+            console.log('DB_APP_CONFIG:', DB_APP_CONFIG);
             const checkResult = await poolAPP.request()
                 .input('numero_nota', sql.VarChar(50), numeroNota)
                 .query('SELECT COUNT(*) as count FROM NotasUsadas WHERE numero_nota = @numero_nota');
