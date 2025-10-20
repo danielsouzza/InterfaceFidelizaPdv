@@ -1318,36 +1318,7 @@ window.addEventListener('load', () => {
     loadSqlConfig();
 });
 
-// Função para carregar configuração SQL e preencher formulário
-async function loadSqlConfig() {
-    try {
-        const response = await fetch(`${API_CONFIG.baseUrl}/sql/config`);
-        const config = await response.json();
 
-        if (config.configured) {
-            // Verificar qual modo está configurado
-            if (config.mode === 'connectionString') {
-                // Modo string de conexão
-                modeConnectionString.checked = true;
-                modeFields.checked = false;
-                document.getElementById('sql-connection-string').value = config.connectionString || '';
-            } else {
-                // Modo campos separados (padrão)
-                modeFields.checked = true;
-                modeConnectionString.checked = false;
-                document.getElementById('sql-server').value = config.server || 'localhost';
-                document.getElementById('sql-database').value = config.database || '';
-                document.getElementById('sql-user').value = config.user || 'sa';
-                document.getElementById('sql-port').value = config.port || 1433;
-            }
-            
-            // Aplicar o modo correto na interface
-            toggleConfigMode();
-        }
-    } catch (error) {
-        console.error('Erro ao carregar configuração SQL:', error);
-    }
-}
 
 // Função para mostrar modal SQL
 function showSqlConfigModal() {
