@@ -5,7 +5,6 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
 const sql = require('mssql');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -55,73 +54,6 @@ console.log('✅ Configuração carregada do .env');
 console.log('📊 Banco PDV:', DB_PDV_CONFIG.server, '/', DB_PDV_CONFIG.database);
 console.log('📊 Banco App:', DB_APP_CONFIG.server, '/', DB_APP_CONFIG.database);
 
-// ========================================
-// INICIALIZAÇÃO DO BANCO DE DADOS
-// ========================================
-
-async function initializeDatabase() {
-    try {
-        console.log('🔧 Inicializando banco de dados...');
-        
-        // Conectar ao banco da aplicação
-        const pool = await sql.connect(DB_APP_CONFIG);
-        
-        // Ler o arquivo de migração
-        const migrationPath = path.join(__dirname, 'init-migrate.sql');
-        
-        if (!fs.existsSync(migrationPath)) {
-            console.log('⚠️  Arquivo init-migrate.sql não encontrado, pulando inicialização automática');
-            await pool.close();
-            return;
-        }
-        
-        const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-        
-        // Dividir o SQL em comandos separados (por GO)
-        const commands = migrationSQL.split(/\r?\nGO\r?\n/i).filter(cmd => cmd.trim());
-        
-        console.log(`📋 Executando ${commands.length} comandos de migração...`);
-        
-        for (let i = 0; i < commands.length; i++) {
-            const command = commands[i].trim();
-            if (command) {
-                try {
-                    await pool.request().query(command);
-                    console.log(`✅ Comando ${i + 1}/${commands.length} executado com sucesso`);
-                } catch (error) {
-                    console.log(`⚠️  Comando ${i + 1}/${commands.length} falhou (pode ser normal se já existe):`, error.message);
-                }
-            }
-        }
-        
-        // Verificar se as tabelas foram criadas com sucesso
-        try {
-            const tablesResult = await pool.request()
-                .query("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('NotasUsadas', 'PontuacaoPendente')");
-            
-            const tablesCreated = tablesResult.recordset.map(t => t.TABLE_NAME);
-            console.log('✅ Tabelas confirmadas no banco:', tablesCreated);
-            
-            if (!tablesCreated.includes('NotasUsadas')) {
-                console.error('⚠️  ATENÇÃO: Tabela NotasUsadas não foi encontrada após a migração!');
-            }
-            if (!tablesCreated.includes('PontuacaoPendente')) {
-                console.error('⚠️  ATENÇÃO: Tabela PontuacaoPendente não foi encontrada após a migração!');
-            }
-            
-        } catch (verifyError) {
-            console.error('❌ Erro ao verificar tabelas criadas:', verifyError.message);
-        }
-        
-        await pool.close();
-        console.log('✅ Inicialização do banco de dados concluída');
-        
-    } catch (error) {
-        console.error('❌ Erro na inicialização do banco de dados:', error.message);
-        console.log('⚠️  O servidor continuará, mas algumas funcionalidades podem não funcionar');
-    }
-}
-
 // Função auxiliar para salvar pontuação pendente
 async function salvarPontuacaoPendente({ numero_nota, valor, cpf_telefone, erro_mensagem, dados_completos }) {
     const pool = await sql.connect(DB_APP_CONFIG);
@@ -131,7 +63,7 @@ async function salvarPontuacaoPendente({ numero_nota, valor, cpf_telefone, erro_
         const checkResult = await pool.request()
             .input('numero_nota', sql.VarChar(50), numero_nota)
             .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
-            .query('SELECT id FROM [dbo].[PontuacaoPendente] WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone AND processado = 0');
+            .query('SELECT id FROM PontuacaoPendente WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone AND processado = 0');
 
         // Se já existe para o mesmo cliente, apenas atualiza
         if (checkResult.recordset.length > 0) {
@@ -142,7 +74,7 @@ async function salvarPontuacaoPendente({ numero_nota, valor, cpf_telefone, erro_
                 .input('erro_mensagem', sql.VarChar(500), erro_mensagem)
                 .input('dados_completos', sql.NVarChar(sql.MAX), dados_completos)
                 .query(`
-                    UPDATE [dbo].[PontuacaoPendente]
+                    UPDATE PontuacaoPendente
                     SET erro_mensagem = @erro_mensagem,
                         dados_completos = @dados_completos,
                         ultima_tentativa = GETDATE(),
@@ -163,7 +95,7 @@ async function salvarPontuacaoPendente({ numero_nota, valor, cpf_telefone, erro_
             .input('erro_mensagem', sql.VarChar(500), erro_mensagem)
             .input('dados_completos', sql.NVarChar(sql.MAX), dados_completos)
             .query(`
-                INSERT INTO [dbo].[PontuacaoPendente]
+                INSERT INTO PontuacaoPendente
                 (numero_nota, valor, cpf_telefone, erro_mensagem, dados_completos, tentativas, processado)
                 VALUES (@numero_nota, @valor, @cpf_telefone, @erro_mensagem, @dados_completos, 1, 0)
             `);
@@ -566,7 +498,7 @@ app.post('/api/sql/check-nota', async (req, res) => {
 
         const result = await pool.request()
             .input('numero_nota', sql.VarChar(50), numero_nota)
-            .query('SELECT COUNT(*) as count FROM [dbo].[NotasUsadas] WHERE numero_nota = @numero_nota');
+            .query('SELECT COUNT(*) as count FROM NotasUsadas WHERE numero_nota = @numero_nota');
 
         await pool.close();
 
@@ -605,7 +537,7 @@ app.post('/api/sql/save-nota-usada', async (req, res) => {
         const checkResult = await pool.request()
             .input('numero_nota', sql.VarChar(50), numero_nota)
             .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
-            .query('SELECT id FROM [dbo].[NotasUsadas] WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone');
+            .query('SELECT id FROM NotasUsadas WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone');
 
         if (checkResult.recordset.length > 0) {
             await pool.close();
@@ -621,7 +553,7 @@ app.post('/api/sql/save-nota-usada', async (req, res) => {
             .input('numero_nota', sql.VarChar(50), numero_nota)
             .input('valor', sql.Decimal(10, 2), parseFloat(valor))
             .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
-            .query('INSERT INTO [dbo].[NotasUsadas] (numero_nota, valor, cpf_telefone) VALUES (@numero_nota, @valor, @cpf_telefone)');
+            .query('INSERT INTO NotasUsadas (numero_nota, valor, cpf_telefone) VALUES (@numero_nota, @valor, @cpf_telefone)');
 
         await pool.close();
 
@@ -650,7 +582,7 @@ app.get('/api/sql/debug-pendentes', async (req, res) => {
         const pool = await sql.connect(DB_APP_CONFIG);
 
         const result = await pool.request()
-            .query('SELECT * FROM [dbo].[PontuacaoPendente] ORDER BY data_criacao DESC');
+            .query('SELECT * FROM PontuacaoPendente ORDER BY data_criacao DESC');
 
         await pool.close();
 
@@ -691,7 +623,7 @@ app.post('/api/sql/check-nota-pendente', async (req, res) => {
             .input('numero_nota', sql.VarChar(50), numero_nota)
             .query(`
                 SELECT id, numero_nota, valor, cpf_telefone, data_criacao
-                FROM [dbo].[PontuacaoPendente]
+                FROM PontuacaoPendente
                 WHERE numero_nota = @numero_nota AND processado = 0
             `);
 
@@ -772,7 +704,7 @@ app.post('/api/sql/confirmar-substituir-pendente', async (req, res) => {
         // Excluir a pontuação pendente anterior
         await pool.request()
             .input('numero_nota', sql.VarChar(50), numero_nota)
-            .query('DELETE FROM [dbo].[PontuacaoPendente] WHERE numero_nota = @numero_nota AND processado = 0');
+            .query('DELETE FROM PontuacaoPendente WHERE numero_nota = @numero_nota AND processado = 0');
 
         await pool.close();
 
@@ -809,8 +741,8 @@ app.post('/api/sql/marcar-pendente-processada', async (req, res) => {
 
         // Marcar como processada (ou deletar se preferir)
         const query = cpf_telefone
-            ? 'UPDATE [dbo].[PontuacaoPendente] SET processado = 1, ultima_tentativa = GETDATE() WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone AND processado = 0'
-            : 'UPDATE [dbo].[PontuacaoPendente] SET processado = 1, ultima_tentativa = GETDATE() WHERE numero_nota = @numero_nota AND processado = 0';
+            ? 'UPDATE PontuacaoPendente SET processado = 1, ultima_tentativa = GETDATE() WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone AND processado = 0'
+            : 'UPDATE PontuacaoPendente SET processado = 1, ultima_tentativa = GETDATE() WHERE numero_nota = @numero_nota AND processado = 0';
 
         const request = pool.request().input('numero_nota', sql.VarChar(50), numero_nota);
 
@@ -850,7 +782,7 @@ app.get('/api/sql/pontuacoes-pendentes', async (req, res) => {
                 SELECT
                     id, numero_nota, valor, cpf_telefone,
                     erro_mensagem, tentativas, data_criacao, ultima_tentativa
-                FROM [dbo].[PontuacaoPendente]
+                FROM PontuacaoPendente
                 WHERE processado = 0
                 ORDER BY data_criacao DESC
             `);
@@ -881,7 +813,7 @@ app.post('/api/sql/processar-pendentes', async (req, res) => {
         const pendentes = await pool.request()
             .query(`
                 SELECT id, dados_completos, numero_nota
-                FROM [dbo].[PontuacaoPendente]
+                FROM PontuacaoPendente
                 WHERE processado = 0 AND tentativas < 5
                 ORDER BY data_criacao ASC
             `);
@@ -924,7 +856,7 @@ app.post('/api/sql/processar-pendentes', async (req, res) => {
                     // Sucesso - marcar como processado
                     await pool.request()
                         .input('id', sql.Int, pendente.id)
-                        .query('UPDATE [dbo].[PontuacaoPendente] SET processado = 1, ultima_tentativa = GETDATE() WHERE id = @id');
+                        .query('UPDATE PontuacaoPendente SET processado = 1, ultima_tentativa = GETDATE() WHERE id = @id');
 
                     resultados.sucesso++;
                     resultados.detalhes.push({
@@ -938,7 +870,7 @@ app.post('/api/sql/processar-pendentes', async (req, res) => {
                     // Falha - incrementar tentativas
                     await pool.request()
                         .input('id', sql.Int, pendente.id)
-                        .query('UPDATE [dbo].[PontuacaoPendente] SET tentativas = tentativas + 1, ultima_tentativa = GETDATE() WHERE id = @id');
+                        .query('UPDATE PontuacaoPendente SET tentativas = tentativas + 1, ultima_tentativa = GETDATE() WHERE id = @id');
 
                     resultados.falha++;
                     resultados.detalhes.push({
@@ -992,6 +924,7 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
         // Buscar do banco PDV
         poolPDV = await sql.connect(DB_PDV_CONFIG);
         const result = await poolPDV.request().query(QUERY_LAST_SALE);
+        poolPDV.close()
 
         if (result.recordset.length === 0) {
             return res.json({
@@ -1016,44 +949,13 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
         if (numeroNota) {
             poolAPP = await sql.connect(DB_APP_CONFIG);
             console.log('DB_APP_CONFIG:', DB_APP_CONFIG);
-            
-            // Debug: Verificar se consegue acessar a tabela
-            try {
-                console.log('🔍 Testando acesso à tabela NotasUsadas...');
-                
-                // Primeiro, vamos listar as tabelas disponíveis
-                const tablesResult = await poolAPP.request()
-                    .query("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'");
-                
-                console.log('📋 Tabelas encontradas no banco:', tablesResult.recordset.map(t => t.TABLE_NAME));
-                
-                // Verificar se NotasUsadas existe especificamente
-                const tableExistsResult = await poolAPP.request()
-                    .query("SELECT COUNT(*) as exists FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'NotasUsadas'");
-                
-                console.log('🔍 Tabela NotasUsadas existe?', tableExistsResult.recordset[0].exists > 0 ? 'SIM' : 'NÃO');
-                
-                // Verificar também com schema completo
-                const schemaResult = await poolAPP.request()
-                    .query(`SELECT TABLE_SCHEMA, TABLE_NAME 
-                           FROM INFORMATION_SCHEMA.TABLES 
-                           WHERE TABLE_NAME = 'NotasUsadas'`);
-                
-                if (schemaResult.recordset.length > 0) {
-                    console.log('📋 Schema da tabela NotasUsadas:', schemaResult.recordset[0]);
-                } else {
-                    console.log('❌ NotasUsadas não encontrada em nenhum schema');
-                }
-                
-            } catch (debugError) {
-                console.error('❌ Erro no debug das tabelas:', debugError.message);
-            }
-            
             const checkResult = await poolAPP.request()
                 .input('numero_nota', sql.VarChar(50), numeroNota)
-                .query('SELECT COUNT(*) as count FROM [dbo].[NotasUsadas] WHERE numero_nota = @numero_nota');
+                .query('SELECT COUNT(*) as count FROM NotasUsadas WHERE numero_nota = @numero_nota');
 
             const isUsed = checkResult.recordset[0].count > 0;
+
+            poolAPP.close()
 
             if (isUsed) {
                 // Última nota JÁ FOI USADA - retorna vazio
@@ -1116,7 +1018,7 @@ async function processarPendentesAutomatico() {
         const pendentes = await pool.request()
             .query(`
                 SELECT id, dados_completos, numero_nota, tentativas
-                FROM [dbo].[PontuacaoPendente]
+                FROM PontuacaoPendente
                 WHERE processado = 0 AND tentativas < 5
                 ORDER BY data_criacao ASC
             `);
@@ -1163,7 +1065,7 @@ async function processarPendentesAutomatico() {
                     // Sucesso - marcar como processado
                     await pool.request()
                         .input('id', sql.Int, pendente.id)
-                        .query('UPDATE [dbo].[PontuacaoPendente] SET processado = 1, ultima_tentativa = GETDATE() WHERE id = @id');
+                        .query('UPDATE PontuacaoPendente SET processado = 1, ultima_tentativa = GETDATE() WHERE id = @id');
 
                     sucessos++;
                     console.log(`✅ Rotina: Pontuação pendente processada com sucesso - Nota ${pendente.numero_nota}`);
@@ -1171,7 +1073,7 @@ async function processarPendentesAutomatico() {
                     // Falha - incrementar tentativas
                     await pool.request()
                         .input('id', sql.Int, pendente.id)
-                        .query('UPDATE [dbo].[PontuacaoPendente] SET tentativas = tentativas + 1, ultima_tentativa = GETDATE() WHERE id = @id');
+                        .query('UPDATE PontuacaoPendente SET tentativas = tentativas + 1, ultima_tentativa = GETDATE() WHERE id = @id');
 
                     falhas++;
                     console.log(`⚠️  Rotina: Falha ao processar pendente - Nota ${pendente.numero_nota} (Tentativa ${pendente.tentativas + 1}/5)`);
@@ -1181,7 +1083,7 @@ async function processarPendentesAutomatico() {
                 try {
                     await pool.request()
                         .input('id', sql.Int, pendente.id)
-                        .query('UPDATE [dbo].[PontuacaoPendente] SET tentativas = tentativas + 1, ultima_tentativa = GETDATE() WHERE id = @id');
+                        .query('UPDATE PontuacaoPendente SET tentativas = tentativas + 1, ultima_tentativa = GETDATE() WHERE id = @id');
                 } catch (updateError) {
                     console.error(`❌ Erro ao atualizar tentativas:`, updateError.message);
                 }
@@ -1208,12 +1110,9 @@ async function processarPendentesAutomatico() {
 }
 
 // Iniciar servidor
-app.listen(PORT, async () => {
+app.listen(PORT, () => {
     console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
     console.log(`📂 Arquivos estáticos servidos de: ${__dirname}`);
-
-    // Inicializar banco de dados
-    await initializeDatabase();
 
     // Iniciar rotina de reprocessamento automático
     console.log(`⏰ Rotina de reprocessamento iniciada (a cada ${INTERVALO_REPROCESSAMENTO} minutos)`);
