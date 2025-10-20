@@ -34,6 +34,16 @@ const btnOpenRegister = document.getElementById('btn-open-register');
 const btnEditCustomer = document.getElementById('btn-edit-customer');
 const mainContent = document.querySelector('.main-content');
 
+// Mobile Customer Card
+const mobileCustomerCard = document.getElementById('mobile-customer-card');
+const closeMobileCard = document.getElementById('close-mobile-card');
+const mobileDetailsBtn = document.getElementById('mobile-details-btn');
+
+// Modal de Detalhes do Cliente (Mobile)
+const customerDetailsModal = document.getElementById('customer-details-modal');
+const closeCustomerDetailsModal = document.getElementById('close-customer-details-modal');
+const btnEditCustomerModal = document.getElementById('btn-edit-customer-modal');
+
 // Modal Cadastro
 const registerModal = document.getElementById('register-modal');
 const closeRegisterModalBtn = document.getElementById('close-register-modal');
@@ -259,15 +269,25 @@ function showIdentifiedSidebar(client) {
     // Fechar outros painéis
     closeSidebarNotFound();
 
-    // Preencher dados do cliente
+    // Preencher dados do cliente no SIDEBAR (Desktop)
     document.getElementById('identified-name').textContent = client.name.toUpperCase();
     document.getElementById('identified-points').textContent = formatPoints(client.points);
-
-    // Cashback já vem no formato correto (não precisa dividir por 100)
     document.getElementById('identified-cashback').textContent = formatCurrency(client.cashback);
-
     document.getElementById('identified-document').textContent = client.cpf ? formatCPF(client.cpf) : client.phone;
     document.getElementById('identified-category').textContent = client.category || 'Padrão';
+
+    // Preencher dados do cliente no CARD MOBILE
+    document.getElementById('mobile-identified-name').textContent = client.name.toUpperCase();
+    document.getElementById('mobile-identified-points').textContent = 'Pontos: '+formatPoints(client.points);
+    document.getElementById('mobile-identified-cashback').textContent = formatCurrency(client.cashback);
+    document.getElementById('mobile-identified-document').textContent = client.cpf ? formatCPF(client.cpf) : client.phone;
+
+    // Preencher dados do cliente no MODAL DE DETALHES (Mobile)
+    document.getElementById('modal-customer-name').textContent = client.name.toUpperCase();
+    document.getElementById('modal-customer-points').textContent = formatPoints(client.points);
+    document.getElementById('modal-customer-cashback').textContent = formatCurrency(client.cashback);
+    document.getElementById('modal-customer-document').textContent = client.cpf ? formatCPF(client.cpf) : client.phone;
+    document.getElementById('modal-customer-category').textContent = client.category || 'Padrão';
 
     console.log('Cliente selecionado:', {
         nome: client.name,
@@ -279,12 +299,15 @@ function showIdentifiedSidebar(client) {
         produtos_disponiveis: client.products?.length || 0
     });
 
-    // Mostrar sidebar
+    // Mostrar sidebar (Desktop)
     sidebarIdentified.classList.remove('hidden');
     setTimeout(() => {
         sidebarIdentified.classList.add('show');
         mainContent.classList.add('with-sidebar');
     }, 10);
+
+    // Mostrar card mobile
+    mobileCustomerCard.classList.remove('hidden');
 }
 
 // Função para fechar sidebar identificado
@@ -294,6 +317,9 @@ function closeSidebarIdentified() {
     setTimeout(() => {
         sidebarIdentified.classList.add('hidden');
     }, 300);
+
+    // Fechar também o card mobile
+    mobileCustomerCard.classList.add('hidden');
 }
 
 // Função para mostrar sidebar de cliente não encontrado
@@ -665,6 +691,53 @@ successModal.addEventListener('click', (e) => {
     }
 });
 
+// ==================== EVENT LISTENERS - MOBILE CARD ====================
+
+// Fechar card mobile
+// closeMobileCard.addEventListener('click', () => {
+//     mobileCustomerCard.classList.add('hidden');
+// });
+
+// Abrir modal de detalhes do cliente (Mobile)
+mobileDetailsBtn.addEventListener('click', () => {
+    customerDetailsModal.classList.remove('hidden');
+    setTimeout(() => {
+        customerDetailsModal.classList.add('show');
+    }, 10);
+});
+
+// Fechar modal de detalhes do cliente
+closeCustomerDetailsModal.addEventListener('click', () => {
+    customerDetailsModal.classList.remove('show');
+    setTimeout(() => {
+        customerDetailsModal.classList.add('hidden');
+    }, 300);
+});
+
+// Fechar modal de detalhes ao clicar fora
+customerDetailsModal.addEventListener('click', (e) => {
+    if (e.target === customerDetailsModal) {
+        customerDetailsModal.classList.remove('show');
+        setTimeout(() => {
+            customerDetailsModal.classList.add('hidden');
+        }, 300);
+    }
+});
+
+// Botão editar do modal de detalhes (Mobile)
+btnEditCustomerModal.addEventListener('click', () => {
+    // Fechar modal de detalhes
+    customerDetailsModal.classList.remove('show');
+    setTimeout(() => {
+        customerDetailsModal.classList.add('hidden');
+    }, 300);
+
+    // Abrir modal de edição de cadastro (mesma função do desktop)
+    if (selectedCustomer) {
+        showEditModal(selectedCustomer);
+    }
+});
+
 // Função para cadastrar consumidor
 async function registerConsumer(data) {
     try {
@@ -917,7 +990,7 @@ registerForm.addEventListener('submit', async (e) => {
     if (documento) requestData.cpf = documento;
     if (sexo) requestData.sexo = sexo;
     if (nascimento) requestData.nascimento = formatDateForAPI(nascimento);
-    if (email && !noEmail) requestData.email = email;
+    if (email ) requestData.email = email;
     if (telefone) requestData.telefone = formatPhoneForAPI(telefone);
 
     console.log(`Dados do ${mode === 'edit' ? 'atualização' : 'cadastro'}:`, requestData);
