@@ -1,3 +1,8 @@
+// Detectar se está rodando no Electron
+const isElectron = navigator.userAgent.toLowerCase().includes('electron');
+
+console.log(`🔧 Ambiente: ${isElectron ? 'Electron (Desktop)' : 'Web (Navegador)'}`);
+
 // Configuração da API
 const API_CONFIG = {
     baseUrl: 'http://localhost:3001/api',
@@ -1320,6 +1325,7 @@ let currentSaleData = null;
 // Função para buscar última venda do SQL Server
 async function fetchLastSale() {
     try {
+        console.log('🔄 fetchLastSale() chamada - buscando última venda...');
         const response = await fetch(`${API_CONFIG.baseUrl}/sql/last-sale-unused`);
         const result = await response.json();
 
@@ -1392,14 +1398,40 @@ async function saveNotaUsada(numero_nota, valor, cpf_telefone) {
     }
 }
 
+// Controle para buscar apenas quando necessário
+let windowHasFocus = document.hasFocus();
+let needsFetch = false; // Flag para indicar se precisa buscar na próxima interação
+
+// Event listener para quando a janela perde o foco
+window.addEventListener('blur', () => {
+    needsFetch = true; // Marcar que precisa buscar quando voltar
+    windowHasFocus = false;
+    console.log('👋 Janela perdeu o foco - próxima interação buscará última venda');
+});
+
 // Event listener para quando a janela recebe foco
 window.addEventListener('focus', () => {
-    console.log('🔍 Janela recebeu foco, buscando última venda...');
+    windowHasFocus = true;
+    console.log(`🔍 [${isElectron ? 'Electron' : 'Web'}] Janela recebeu foco, buscando última venda...`);
     fetchLastSale();
+    needsFetch = false; // Já buscou
 });
+console.log('✅ Event listener de foco habilitado');
+
+// Event listener para quando o usuário clica na janela (detecção imediata)
+// Só busca no PRIMEIRO clique após voltar para a janela
+document.addEventListener('click', () => {
+    if (needsFetch && windowHasFocus) {
+        console.log('🖱️  Primeiro clique após voltar - buscando última venda...');
+        fetchLastSale();
+        needsFetch = false; // Já buscou, não buscar em próximos cliques
+    }
+}, true); // Usar capture phase para pegar todos os cliques
+console.log('✅ Event listener de clique inteligente habilitado (apenas primeiro clique após voltar)');
 
 // Buscar valor ao carregar a página
 window.addEventListener('load', () => {
+    console.log('✅ Página carregada, iniciando busca de última venda...');
     fetchLastSale();
     loadSqlConfig();
 });

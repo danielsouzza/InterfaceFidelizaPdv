@@ -137,20 +137,50 @@ function createWindow() {
         return { action: 'deny' };
     });
 
-    // Adicionar listener de foco para buscar última venda quando a janela receber foco
-    mainWindow.on('focus', () => {
-        console.log('🔍 Janela recebeu foco - buscando última venda...');
+    // Função auxiliar para buscar última venda
+    const triggerFetchLastSale = (eventName) => {
+        console.log(`🔍 [${eventName}] Buscando última venda...`);
 
-        // Executar a função de buscar última venda na página
-        mainWindow.webContents.executeJavaScript(`
-            if (typeof fetchLastSale === 'function') {
-                console.log('🔍 Electron focus event - buscando última venda...');
-                fetchLastSale();
-            }
-        `).catch(err => {
-            console.error('Erro ao executar fetchLastSale:', err);
-        });
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.executeJavaScript(`
+                if (typeof fetchLastSale === 'function') {
+                    console.log('🔍 Electron [${eventName}] - executando fetchLastSale()');
+                    fetchLastSale();
+                } else {
+                    console.error('❌ fetchLastSale não está definida!');
+                }
+            `).catch(err => {
+                console.error(`❌ Erro ao executar fetchLastSale [${eventName}]:`, err.message);
+            });
+        }
+    };
+
+    // MÚLTIPLOS EVENTOS para garantir que funcione quando a janela receber foco
+
+    // 1. Evento de foco da janela
+    mainWindow.on('focus', () => {
+        triggerFetchLastSale('focus');
     });
+
+    // 2. Evento quando janela é mostrada
+    mainWindow.on('show', () => {
+        triggerFetchLastSale('show');
+    });
+
+    // 3. Evento quando janela é restaurada de minimizada
+    mainWindow.on('restore', () => {
+        triggerFetchLastSale('restore');
+    });
+
+    // 4. Evento de visibilidade do webContents
+    mainWindow.webContents.on('page-title-updated', () => {
+        // Este evento dispara quando a página fica visível novamente
+        if (mainWindow.isFocused()) {
+            triggerFetchLastSale('page-title-updated');
+        }
+    });
+
+    console.log('✅ Eventos de foco configurados (focus, show, restore)');
 }
 
 // Quando o Electron estiver pronto
