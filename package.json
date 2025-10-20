@@ -42,8 +42,14 @@
       "**/*",
       "!node_modules/electron/**/*",
       "!node_modules/electron-builder/**/*",
+      "!node_modules/nodemon/**/*",
       "!dist/**/*",
-      "!.git/**/*"
+      "!.git/**/*",
+      "!*.md",
+      "!.gitignore"
+    ],
+    "asarUnpack": [
+      "**/*.node"
     ],
     "win": {
       "target": [
