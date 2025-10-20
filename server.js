@@ -430,10 +430,7 @@ app.post('/api/dados-cliente', async (req, res) => {
 
 // Query para buscar última venda (pode ser personalizada via .env se necessário)
 const QUERY_LAST_SALE = process.env.QUERY_LAST_SALE;
-console.log('QUERY_LAST_SALE:', QUERY_LAST_SALE);
-console.log('DB_PDV_CONFIG:', DB_PDV_CONFIG);
-console.log('QUERY_LAST_SALE:', QUERY_LAST_SALE);
-console.log('DB_PDV_CONFIG:', DB_PDV_CONFIG);
+
 // Rota para buscar última venda (do banco PDV)
 app.get('/api/sql/last-sale', async (req, res) => {
     try {
@@ -940,7 +937,7 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
 
         // Tentar encontrar campo numero_nota
         for (const key in lastSale) {
-            if (key.toLowerCase().includes('numero') || key.toLowerCase().includes('nota')) {
+            if (key.includes('COD_VND_NOTA') || key.toLowerCase().includes('numero') || key.toLowerCase().includes('nota')) {
                 numeroNota = lastSale[key];
                 break;
             }
@@ -967,27 +964,20 @@ app.get('/api/sql/last-sale-unused', async (req, res) => {
         }
 
         // Extrair valor da última nota (não usada)
-        const valorFields = ['valor', 'valor_total', 'total', 'valor_venda', 'preco', 'preco_total'];
+        const valorFields = ['VLR_TOTAL','VLR_PRECO_TOTAL','valor'];
         let valor = 0;
 
+        // Tentar encontrar campo de valor pelos nomes conhecidos (case insensitive)
         for (const fieldName of valorFields) {
             for (const key in lastSale) {
-                if (key.toLowerCase() === fieldName && typeof lastSale[key] === 'number' && lastSale[key] > 0) {
-                    valor = lastSale[key];
+                if (key.toLowerCase() == fieldName.toLowerCase()) {
+                    valor = sale[key];
                     break;
                 }
             }
             if (valor > 0) break;
         }
 
-        if (valor === 0) {
-            for (const key in lastSale) {
-                if (typeof lastSale[key] === 'number' && lastSale[key] > 0) {
-                    valor = lastSale[key];
-                    break;
-                }
-            }
-        }
 
         res.json({
             success: true,
