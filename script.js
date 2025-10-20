@@ -1412,6 +1412,50 @@ if (isElectron) {
     console.log('ℹ️  Modo Electron: polling inteligente ativo (busca ao voltar para janela)');
 }
 
+// ==================== BOTÃO ATUALIZAR + ATALHO F5 ====================
+
+// Botão "Atualizar Nota"
+const btnAtualizarNota = document.getElementById('btn-atualizar-nota');
+if (btnAtualizarNota) {
+    btnAtualizarNota.addEventListener('click', () => {
+        console.log('🔄 Botão "Atualizar" clicado - buscando última venda...');
+
+        // Feedback visual
+        const originalText = btnAtualizarNota.innerHTML;
+        btnAtualizarNota.disabled = true;
+        btnAtualizarNota.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style="margin-right: 5px; animation: spin 1s linear infinite;">
+                <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" fill="currentColor"/>
+            </svg>
+            Buscando...
+        `;
+
+        fetchLastSale();
+
+        // Restaurar botão após 1 segundo
+        setTimeout(() => {
+            btnAtualizarNota.disabled = false;
+            btnAtualizarNota.innerHTML = originalText;
+        }, 1000);
+    });
+    console.log('✅ Botão "Atualizar Nota" configurado');
+}
+
+// Atalho F5 para atualizar
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'F5') {
+        e.preventDefault(); // Evitar reload da página
+        console.log('⌨️  Atalho F5 pressionado - buscando última venda...');
+
+        if (btnAtualizarNota) {
+            btnAtualizarNota.click(); // Simular clique no botão
+        } else {
+            fetchLastSale();
+        }
+    }
+});
+console.log('✅ Atalho F5 configurado');
+
 // Buscar valor ao carregar a página
 window.addEventListener('load', () => {
     console.log('✅ Página carregada, iniciando busca de última venda...');
