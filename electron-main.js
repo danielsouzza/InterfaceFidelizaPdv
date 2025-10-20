@@ -72,11 +72,14 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             enableRemoteModule: false,
-            webSecurity: true
+            webSecurity: true,
+            backgroundThrottling: false // IMPORTANTE: Evita throttling quando a janela perde foco
         },
         autoHideMenuBar: true, // Esconde o menu automaticamente
         title: 'Sistema de Fidelidade - PDV',
-        show: false // Não mostrar até estar pronto
+        show: false, // Não mostrar até estar pronto
+        skipTaskbar: false, // Garantir que apareça na barra de tarefas
+        alwaysOnTop: false // Não ficar sempre no topo
     });
 
     // Mostrar janela quando estiver pronta
@@ -141,7 +144,7 @@ function createWindow() {
     const triggerFetchLastSale = (eventName) => {
         console.log(`🔍 [${eventName}] Buscando última venda...`);
 
-        if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
             mainWindow.webContents.executeJavaScript(`
                 if (typeof fetchLastSale === 'function') {
                     console.log('🔍 Electron [${eventName}] - executando fetchLastSale()');
@@ -155,32 +158,65 @@ function createWindow() {
         }
     };
 
+    // Variável para controlar último evento de foco (evitar duplicatas)
+    let lastFocusTime = 0;
+    const DEBOUNCE_TIME = 500; // 500ms entre eventos
+
+    const handleFocusEvent = (eventName) => {
+        const now = Date.now();
+        if (now - lastFocusTime > DEBOUNCE_TIME) {
+            lastFocusTime = now;
+            triggerFetchLastSale(eventName);
+        } else {
+            console.log(`⏭️  [${eventName}] ignorado (debounce)`);
+        }
+    };
+
     // MÚLTIPLOS EVENTOS para garantir que funcione quando a janela receber foco
 
-    // 1. Evento de foco da janela
+    // 1. Evento de foco da janela (principal)
     mainWindow.on('focus', () => {
-        triggerFetchLastSale('focus');
+        handleFocusEvent('focus');
     });
 
     // 2. Evento quando janela é mostrada
     mainWindow.on('show', () => {
-        triggerFetchLastSale('show');
+        handleFocusEvent('show');
     });
 
     // 3. Evento quando janela é restaurada de minimizada
     mainWindow.on('restore', () => {
-        triggerFetchLastSale('restore');
+        handleFocusEvent('restore');
     });
 
-    // 4. Evento de visibilidade do webContents
-    mainWindow.webContents.on('page-title-updated', () => {
-        // Este evento dispara quando a página fica visível novamente
-        if (mainWindow.isFocused()) {
-            triggerFetchLastSale('page-title-updated');
+    // 4. Evento de visibilidade do documento (Page Visibility API)
+    // Este é o MAIS CONFIÁVEL em modo produção
+    mainWindow.webContents.on('did-finish-load', () => {
+        // Injetar listener de visibilidade na página
+        mainWindow.webContents.executeJavaScript(`
+            // API de Visibilidade do Documento - funciona melhor em produção
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    console.log('📄 [visibilitychange] Documento ficou visível - buscando última venda...');
+                    if (typeof fetchLastSale === 'function') {
+                        fetchLastSale();
+                    }
+                }
+            });
+            console.log('✅ Listener de visibilidade do documento instalado');
+        `).catch(err => {
+            console.error('Erro ao injetar listener de visibilidade:', err);
+        });
+    });
+
+    // 5. Evento quando a janela se torna ativa (específico do Windows)
+    app.on('browser-window-focus', (event, window) => {
+        if (window === mainWindow) {
+            handleFocusEvent('browser-window-focus');
         }
     });
 
-    console.log('✅ Eventos de foco configurados (focus, show, restore)');
+    console.log('✅ Eventos de foco configurados (focus, show, restore, visibilitychange, browser-window-focus)');
 }
 
 // Quando o Electron estiver pronto

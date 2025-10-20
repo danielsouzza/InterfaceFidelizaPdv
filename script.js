@@ -1412,11 +1412,26 @@ window.addEventListener('blur', () => {
 // Event listener para quando a janela recebe foco
 window.addEventListener('focus', () => {
     windowHasFocus = true;
-    console.log(`🔍 [${isElectron ? 'Electron' : 'Web'}] Janela recebeu foco, buscando última venda...`);
+    console.log(`🔍 [focus] Janela recebeu foco, buscando última venda...`);
     fetchLastSale();
     needsFetch = false; // Já buscou
 });
 console.log('✅ Event listener de foco habilitado');
+
+// API de Visibilidade do Documento - MAIS CONFIÁVEL em modo produção (Electron buildado)
+if (typeof document.hidden !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            console.log('📄 [visibilitychange] Documento ficou visível - buscando última venda...');
+            fetchLastSale();
+            needsFetch = false; // Já buscou
+        } else {
+            needsFetch = true; // Marcar que precisa buscar quando voltar
+            console.log('👋 [visibilitychange] Documento ficou oculto');
+        }
+    });
+    console.log('✅ Page Visibility API habilitada (melhor para Electron em produção)');
+}
 
 // Event listener para quando o usuário clica na janela (detecção imediata)
 // Só busca no PRIMEIRO clique após voltar para a janela
