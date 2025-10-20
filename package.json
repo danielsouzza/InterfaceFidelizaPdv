@@ -45,8 +45,13 @@
       "!node_modules/nodemon/**/*",
       "!dist/**/*",
       "!.git/**/*",
-      "!*.md",
-      "!.gitignore"
+      "!BUILD_INSTRUCTIONS.md",
+      "!.gitignore",
+      "!sql-config.json",
+      ".env.example",
+      "GUIA_INSTALACAO.md",
+      "create-notas-usadas.sql",
+      "criar_tabela_pontuacao_pendente.sql"
     ],
     "asarUnpack": [
       "**/*.node"

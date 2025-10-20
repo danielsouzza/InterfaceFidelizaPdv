@@ -20,6 +20,7 @@ const FIDELIMAX_API = {
 // Elementos do DOM
 const cpfInput = document.getElementById('cpf');
 const valueInput = document.getElementById('value');
+const notaFiscalInput = document.getElementById('nota-fiscal');
 const searchBtn = document.getElementById('search-btn');
 const registerScoreBtn = document.getElementById('register-score-btn');
 const registerClientBtn = document.getElementById('register-client-btn');
@@ -1138,8 +1139,13 @@ registerScoreBtn.addEventListener('click', async () => {
         // Atualizar texto do botão
         registerScoreBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2" opacity="0.3"/></svg> Pontuando...';
 
-        // Chamar API para pontuar
-        const result = await addPointsToCustomer(selectedCustomer, value, currentSaleData['numero_nota']);
+        // Pegar número da nota fiscal do campo (pode ser editado pelo usuário)
+        const numeroNotaFiscal = notaFiscalInput.value.trim();
+
+        // Chamar API para pontuar, enviando o número da nota fiscal no parâmetro verificador
+        const result = await addPointsToCustomer(selectedCustomer, value, currentSaleData['numero_nota'], {
+            verificador: numeroNotaFiscal
+        });
 
         if (result.success) {
             // Guardar saldo anterior para calcular pontos ganhos
@@ -1214,8 +1220,9 @@ registerScoreBtn.addEventListener('click', async () => {
                 currentCashback: selectedCustomer.cashback
             });
 
-            // Limpar valor
+            // Limpar valor e nota fiscal
             valueInput.value = '';
+            notaFiscalInput.value = '';
 
             console.log(`Pontuação realizada:`, {
                 cliente: selectedCustomer.name,
@@ -1327,18 +1334,24 @@ async function fetchLastSale() {
                 // Preencher campo de valor automaticamente
                 valueInput.value = formatCurrency(valor);
 
+                // Preencher campo de nota fiscal automaticamente
+                if (result.numero_nota) {
+                    notaFiscalInput.value = result.numero_nota;
+                }
+
                 // Habilitar botão de pontuar se tiver cliente selecionado
                 if (selectedCustomer) {
                     registerScoreBtn.disabled = false;
                 }
 
-                console.log('✅ Última venda não usada buscada:', valor, currentSaleData);
+                console.log('✅ Última venda não usada buscada:', valor, 'Nota:', result.numero_nota, currentSaleData);
             }
         } else {
             console.log('⚠️ ', result.message || 'Nenhuma nota disponível');
             // Limpar valor se a última nota já foi usada
             if (result.message && result.message.includes('já foi usada')) {
                 valueInput.value = '';
+                notaFiscalInput.value = '';
                 currentSaleData = null;
                 lastFetchedValue = null;
                 showNotification(result.message, 'error');
