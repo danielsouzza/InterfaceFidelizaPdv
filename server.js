@@ -61,7 +61,7 @@ async function salvarPontuacaoPendente({ numero_nota, valor, cpf_telefone, erro_
     try {
         // Verificar se já existe pendente com esse número e mesmo CPF/telefone
         const checkResult = await pool.request()
-            .input('numero_nota', sql.VarChar(50), numero_nota)
+            .input('numero_nota', sql.VarChar(50), numero_nota + "")
             .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
             .query('SELECT id FROM PontuacaoPendente WHERE numero_nota = @numero_nota AND cpf_telefone = @cpf_telefone AND processado = 0');
 
@@ -89,7 +89,7 @@ async function salvarPontuacaoPendente({ numero_nota, valor, cpf_telefone, erro_
 
         // Se não existe para esse cliente, insere novo (nota: o conflito com outro CPF já foi resolvido no front)
         await pool.request()
-            .input('numero_nota', sql.VarChar(50), numero_nota)
+            .input('numero_nota', sql.VarChar(50), numero_nota + "")
             .input('valor', sql.Decimal(10, 2), parseFloat(valor))
             .input('cpf_telefone', sql.VarChar(20), cpf_telefone)
             .input('erro_mensagem', sql.VarChar(500), erro_mensagem)
