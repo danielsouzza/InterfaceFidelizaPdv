@@ -1398,51 +1398,19 @@ async function saveNotaUsada(numero_nota, valor, cpf_telefone) {
     }
 }
 
-// Controle para buscar apenas quando necessário
-let windowHasFocus = document.hasFocus();
-let needsFetch = false; // Flag para indicar se precisa buscar na próxima interação
-
-// Event listener para quando a janela perde o foco
-window.addEventListener('blur', () => {
-    needsFetch = true; // Marcar que precisa buscar quando voltar
-    windowHasFocus = false;
-    console.log('👋 Janela perdeu o foco - próxima interação buscará última venda');
-});
-
-// Event listener para quando a janela recebe foco
-window.addEventListener('focus', () => {
-    windowHasFocus = true;
-    console.log(`🔍 [focus] Janela recebeu foco, buscando última venda...`);
-    fetchLastSale();
-    needsFetch = false; // Já buscou
-});
-console.log('✅ Event listener de foco habilitado');
-
-// API de Visibilidade do Documento - MAIS CONFIÁVEL em modo produção (Electron buildado)
-if (typeof document.hidden !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-            console.log('📄 [visibilitychange] Documento ficou visível - buscando última venda...');
-            fetchLastSale();
-            needsFetch = false; // Já buscou
-        } else {
-            needsFetch = true; // Marcar que precisa buscar quando voltar
-            console.log('👋 [visibilitychange] Documento ficou oculto');
-        }
+// Event listener simples para quando a janela recebe foco (versão web)
+if (!isElectron) {
+    window.addEventListener('focus', () => {
+        console.log('🔍 [Web] Janela recebeu foco - buscando última venda...');
+        fetchLastSale();
     });
-    console.log('✅ Page Visibility API habilitada (melhor para Electron em produção)');
+    console.log('✅ Event listener de foco habilitado (versão Web)');
 }
 
-// Event listener para quando o usuário clica na janela (detecção imediata)
-// Só busca no PRIMEIRO clique após voltar para a janela
-document.addEventListener('click', () => {
-    if (needsFetch && windowHasFocus) {
-        console.log('🖱️  Primeiro clique após voltar - buscando última venda...');
-        fetchLastSale();
-        needsFetch = false; // Já buscou, não buscar em próximos cliques
-    }
-}, true); // Usar capture phase para pegar todos os cliques
-console.log('✅ Event listener de clique inteligente habilitado (apenas primeiro clique após voltar)');
+// Para Electron: o polling inteligente no electron-main.js cuida disso
+if (isElectron) {
+    console.log('ℹ️  Modo Electron: polling inteligente ativo (busca ao voltar para janela)');
+}
 
 // Buscar valor ao carregar a página
 window.addEventListener('load', () => {

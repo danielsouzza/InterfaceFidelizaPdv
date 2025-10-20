@@ -140,83 +140,55 @@ function createWindow() {
         return { action: 'deny' };
     });
 
-    // Função auxiliar para buscar última venda
-    const triggerFetchLastSale = (eventName) => {
-        console.log(`🔍 [${eventName}] Buscando última venda...`);
+    // SOLUÇÃO GARANTIDA: Polling Inteligente
+    // Só busca quando você NÃO está na janela, para quando você volta
 
-        if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
-            mainWindow.webContents.executeJavaScript(`
-                if (typeof fetchLastSale === 'function') {
-                    console.log('🔍 Electron [${eventName}] - executando fetchLastSale()');
-                    fetchLastSale();
-                } else {
-                    console.error('❌ fetchLastSale não está definida!');
-                }
-            `).catch(err => {
-                console.error(`❌ Erro ao executar fetchLastSale [${eventName}]:`, err.message);
-            });
-        }
-    };
+    let pollingInterval = null;
+    let wasOutOfFocus = false;
 
-    // Variável para controlar último evento de foco (evitar duplicatas)
-    let lastFocusTime = 0;
-    const DEBOUNCE_TIME = 500; // 500ms entre eventos
+    const startSmartPolling = () => {
+        // Verificar a cada 2 segundos se a janela voltou ao foco
+        if (!pollingInterval) {
+            console.log('🔄 Iniciando polling inteligente (detecta quando você volta)');
 
-    const handleFocusEvent = (eventName) => {
-        const now = Date.now();
-        if (now - lastFocusTime > DEBOUNCE_TIME) {
-            lastFocusTime = now;
-            triggerFetchLastSale(eventName);
-        } else {
-            console.log(`⏭️  [${eventName}] ignorado (debounce)`);
-        }
-    };
+            pollingInterval = setInterval(() => {
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    const isFocused = mainWindow.isFocused();
 
-    // MÚLTIPLOS EVENTOS para garantir que funcione quando a janela receber foco
+                    // Se estava fora e voltou = BUSCAR!
+                    if (isFocused && wasOutOfFocus) {
+                        console.log('✅ Detectado retorno ao foco - buscando última venda!');
+                        wasOutOfFocus = false;
 
-    // 1. Evento de foco da janela (principal)
-    mainWindow.on('focus', () => {
-        handleFocusEvent('focus');
-    });
+                        mainWindow.webContents.executeJavaScript(`
+                            if (typeof fetchLastSale === 'function') {
+                                fetchLastSale();
+                            }
+                        `).catch(err => {
+                            console.error('Erro ao executar fetchLastSale:', err);
+                        });
+                    }
 
-    // 2. Evento quando janela é mostrada
-    mainWindow.on('show', () => {
-        handleFocusEvent('show');
-    });
-
-    // 3. Evento quando janela é restaurada de minimizada
-    mainWindow.on('restore', () => {
-        handleFocusEvent('restore');
-    });
-
-    // 4. Evento de visibilidade do documento (Page Visibility API)
-    // Este é o MAIS CONFIÁVEL em modo produção
-    mainWindow.webContents.on('did-finish-load', () => {
-        // Injetar listener de visibilidade na página
-        mainWindow.webContents.executeJavaScript(`
-            // API de Visibilidade do Documento - funciona melhor em produção
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) {
-                    console.log('📄 [visibilitychange] Documento ficou visível - buscando última venda...');
-                    if (typeof fetchLastSale === 'function') {
-                        fetchLastSale();
+                    // Atualizar estado
+                    if (!isFocused) {
+                        wasOutOfFocus = true;
                     }
                 }
-            });
-            console.log('✅ Listener de visibilidade do documento instalado');
-        `).catch(err => {
-            console.error('Erro ao injetar listener de visibilidade:', err);
-        });
-    });
-
-    // 5. Evento quando a janela se torna ativa (específico do Windows)
-    app.on('browser-window-focus', (event, window) => {
-        if (window === mainWindow) {
-            handleFocusEvent('browser-window-focus');
+            }, 2000); // Verifica a cada 2 segundos
         }
+    };
+
+    // Iniciar polling após página carregar
+    mainWindow.webContents.on('did-finish-load', () => {
+        console.log('✅ Página carregada - iniciando sistema de detecção de foco');
+
+        // Aguardar 3 segundos e iniciar polling
+        setTimeout(() => {
+            startSmartPolling();
+        }, 3000);
     });
 
-    console.log('✅ Eventos de foco configurados (focus, show, restore, visibilitychange, browser-window-focus)');
+    console.log('✅ Sistema de polling inteligente configurado');
 }
 
 // Quando o Electron estiver pronto
