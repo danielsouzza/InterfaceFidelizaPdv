@@ -126,9 +126,9 @@ function createWindow() {
     setTimeout(tryLoadUrl, 3000);
 
     // Abrir DevTools em desenvolvimento
-    if (isDev) {
-        mainWindow.webContents.openDevTools();
-    }
+    // if (isDev) {
+    //     mainWindow.webContents.openDevTools();
+    // }
 
     mainWindow.on('closed', () => {
         mainWindow = null;
