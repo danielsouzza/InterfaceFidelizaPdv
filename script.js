@@ -11,7 +11,8 @@ const API_CONFIG = {
         addPoints: '/pontuar-cliente',
         registerClient: '/cadastrar-cliente',
         updateClient: '/atualizar-cliente',
-        getClientData: '/dados-cliente'
+        getClientData: '/dados-cliente',
+        getExtrato: '/extrato-cliente'
     }
 };
 
@@ -474,7 +475,7 @@ function closeRegisterModal() {
 }
 
 // Função para mostrar modal de histórico
-function showHistoryModal(client) {
+async function showHistoryModal(client) {
     if (!client) {
         showNotification('Selecione um cliente primeiro', 'error');
         return;
@@ -486,45 +487,97 @@ function showHistoryModal(client) {
     document.getElementById('history-points-expire').textContent = formatPoints(client.pointsToExpire || 0);
     document.getElementById('history-cashback').textContent = formatCurrency(client.cashback);
 
-    // Preencher produtos
-    const productsGrid = document.getElementById('products-grid');
-    const noProducts = document.getElementById('no-products');
-
-    productsGrid.innerHTML = '';
-
-    if (client.products && client.products.length > 0) {
-        noProducts.classList.add('hidden');
-
-        client.products.forEach(product => {
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card';
-
-            productCard.innerHTML = `
-                <img src="${product.foto || 'https://via.placeholder.com/250x180?text=Sem+Imagem'}"
-                     alt="${product.nome}"
-                     class="product-image"
-                     onerror="this.src='https://via.placeholder.com/250x180?text=Sem+Imagem'">
-                <div class="product-info">
-                    <div class="product-name">${product.nome}</div>
-                    ${product.descricao ? `<div class="product-description">${product.descricao}</div>` : ''}
-                    <div class="product-points">
-                        <span class="product-points-label">Pontos necessários:</span>
-                        <span class="product-points-value">${formatPoints(product.pontos)}</span>
-                    </div>
-                </div>
-            `;
-
-            productsGrid.appendChild(productCard);
-        });
-    } else {
-        noProducts.classList.remove('hidden');
-    }
-
-    // Mostrar modal
+    // Mostrar modal com loading
     historyModal.classList.remove('hidden');
     setTimeout(() => {
         historyModal.classList.add('show');
     }, 10);
+
+    // Buscar extrato do cliente
+    const extratoContainer = document.getElementById('extrato-container');
+    const extratoList = document.getElementById('extrato-list');
+    const noExtrato = document.getElementById('no-extrato');
+
+    extratoList.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">Carregando histórico...</div>';
+
+    try {
+        const requestBody = {};
+        if (client.cpf) requestBody.cpf = cleanInput(client.cpf);
+        if (client.phone) requestBody.telefone = cleanInput(client.phone);
+
+        const response = await fetch(`${API_CONFIG.baseUrl}/extrato-cliente`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
+        });
+
+        const data = await response.json();
+
+        if (data.CodigoResposta === 100 && data.extrato && data.extrato.length > 0) {
+            noExtrato.classList.add('hidden');
+            extratoList.classList.remove('hidden');
+
+            extratoList.innerHTML = data.extrato.map(item => {
+                const dataFormatada = new Date(item.data_pontuacao).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+
+                const validadeFormatada = item.data_expiracao ?
+                    new Date(item.data_expiracao).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    }) : null;
+
+                // Determinar tipo: crédito ou débito
+                const isCredito = item.credito > 0;
+                const pontos = isCredito ? item.credito : item.debito;
+
+                return `
+                    <div class="extrato-item ${isCredito ? 'credito' : 'debito'}">
+                        <div class="extrato-icon">
+                            ${isCredito ?
+                                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="currentColor"/></svg>' :
+                                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 12V22H4V12M2 7H22M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+                            }
+                        </div>
+                        <div class="extrato-content">
+                            <div class="extrato-header">
+                                <span class="extrato-title">${isCredito ? 'Cliente Pontuado' : (item.premio_nome || 'Resgate de Prêmio')}</span>
+                                <span class="extrato-points ${isCredito ? 'green' : 'red'}">
+                                    ${isCredito ? '+' : '-'} ${formatPoints(pontos)} Pontos
+                                </span>
+                            </div>
+                            <div class="extrato-details">
+                                ${isCredito ? `
+                                    <div class="extrato-detail">Pontos de Compra</div>
+                                    ${validadeFormatada ? `<div class="extrato-detail">Validade: ${validadeFormatada}</div>` : ''}
+                                    ${item.verificador ? `<div class="extrato-detail">Nota: ${item.verificador}</div>` : ''}
+                                    ${item.tipo_compra ? `<div class="extrato-detail">Tipo: ${item.tipo_compra}</div>` : ''}
+                                    ${item.loja ? `<div class="extrato-detail">Loja: ${item.loja}</div>` : ''}
+                                ` : `
+                                    ${item.premio_nome ? `<div class="extrato-detail">Prêmio: ${item.premio_nome}</div>` : ''}
+                                    ${item.voucher ? `<div class="extrato-detail">Voucher: ${item.voucher} ${item.voucher_resgatado ? '✅ Resgatado' : '⏳ Pendente'}</div>` : ''}
+                                    ${item.loja ? `<div class="extrato-detail">Loja: ${item.loja}</div>` : ''}
+                                `}
+                            </div>
+                            <div class="extrato-date">${dataFormatada}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            extratoList.classList.add('hidden');
+            noExtrato.classList.remove('hidden');
+        }
+    } catch (error) {
+        console.error('Erro ao buscar extrato:', error);
+        extratoList.innerHTML = '<div style="text-align: center; padding: 40px; color: #ef4444;">Erro ao carregar histórico</div>';
+    }
 }
 
 // Função para fechar modal de histórico

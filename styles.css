@@ -1682,3 +1682,203 @@ textarea {
         display: flex;
     }
 }
+
+/* ==================== EXTRATO / TIMELINE DO HISTÓRICO ==================== */
+
+.extrato-section {
+    margin-top: 20px;
+}
+
+.extrato-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+/* Scrollbar customizada */
+.extrato-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.extrato-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.extrato-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+.extrato-list::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.extrato-item {
+    display: flex;
+    gap: 15px;
+    padding: 20px;
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+
+
+.extrato-item:last-child::before {
+    display: none;
+}
+
+.extrato-item.credito {
+    border-left: 4px solid #10b981;
+}
+
+.extrato-item.credito:hover {
+    border-color: #10b981;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+    transform: translateX(2px);
+}
+
+.extrato-item.debito {
+    border-left: 4px solid #f59e0b;
+}
+
+.extrato-item.debito:hover {
+    border-color: #f59e0b;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+    transform: translateX(2px);
+}
+
+.extrato-icon {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+}
+
+.extrato-item.credito .extrato-icon {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.extrato-item.debito .extrato-icon {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.extrato-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.extrato-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 12px;
+    gap: 15px;
+}
+
+.extrato-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+.extrato-points {
+    font-size: 1.1rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.extrato-points.green {
+    color: #10b981;
+}
+
+.extrato-points.red {
+    color: #f59e0b;
+}
+
+.extrato-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.extrato-detail {
+    font-size: 0.9rem;
+    color: #6b7280;
+    line-height: 1.4;
+}
+
+.extrato-date {
+    font-size: 0.85rem;
+    color: #9ca3af;
+    font-weight: 500;
+    margin-top: 8px;
+}
+
+.no-extrato {
+    text-align: center;
+    padding: 60px 20px;
+}
+
+.no-extrato svg {
+    margin-bottom: 20px;
+}
+
+.no-extrato p {
+    color: #6b7280;
+    font-size: 1rem;
+}
+
+/* Responsividade do Extrato */
+@media (max-width: 768px) {
+    .extrato-item {
+        padding: 15px;
+    }
+
+    .extrato-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .extrato-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .extrato-item::before {
+        left: 27px;
+    }
+
+    .extrato-header {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .extrato-title {
+        font-size: 1rem;
+    }
+
+    .extrato-points {
+        font-size: 1rem;
+    }
+
+    .extrato-list {
+        max-height: 400px;
+    }
+}

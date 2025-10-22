@@ -426,6 +426,49 @@ app.post('/api/dados-cliente', async (req, res) => {
     }
 });
 
+// Rota proxy para extrato do consumidor
+app.post('/api/extrato-cliente', async (req, res) => {
+    try {
+        const { cpf, telefone } = req.body;
+
+        console.log('Buscando extrato do cliente:', { cpf, telefone });
+
+        const requestBody = {};
+
+        // Adicionar campos de busca
+        if (cpf) requestBody.cpf = cpf;
+        if (telefone) requestBody.telefone = telefone;
+
+        const response = await fetch(`${API_CONFIG.baseUrl}/ExtratoConsumidor`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'AuthToken': API_CONFIG.authToken
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        const data = await response.json();
+
+        console.log('Resposta ExtratoConsumidor:', data);
+
+        if (!response.ok) {
+            return res.status(response.status).json({
+                error: 'Erro na API Fidelimax',
+                details: data
+            });
+        }
+
+        res.json(data);
+    } catch (error) {
+        console.error('Erro ao buscar extrato do cliente:', error);
+        res.status(500).json({
+            error: 'Erro interno do servidor',
+            message: error.message
+        });
+    }
+});
+
 // ==================== ROTAS SQL SERVER ====================
 
 // Query para buscar última venda (pode ser personalizada via .env se necessário)
