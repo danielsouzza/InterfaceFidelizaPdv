@@ -1336,6 +1336,8 @@ valueInput.addEventListener('input', (e) => {
 
 // Elementos do DOM para SQL
 const sqlConfigModal = document.getElementById('sql-config-modal');
+const mainWindow = document.getElementById('main-content');
+
 const btnOpenSqlConfig = document.getElementById('btn-open-sql-config');
 const closeSqlConfigModalBtn = document.getElementById('close-sql-config-modal');
 const sqlConfigForm = document.getElementById('sql-config-form');
@@ -1452,13 +1454,10 @@ async function saveNotaUsada(numero_nota, valor, cpf_telefone) {
 }
 
 // Event listener simples para quando a janela recebe foco (versão web)
-if (!isElectron) {
-    window.addEventListener('focus', () => {
-        console.log('🔍 [Web] Janela recebeu foco - buscando última venda...');
-        fetchLastSale();
-    });
-    console.log('✅ Event listener de foco habilitado (versão Web)');
-}
+mainWindow.addEventListener('focusin', () => {
+    console.log('🔍 [Web] Janela recebeu foco - buscando última venda...');
+    fetchLastSale();
+});
 
 // Para Electron: o polling inteligente no electron-main.js cuida disso
 if (isElectron) {
