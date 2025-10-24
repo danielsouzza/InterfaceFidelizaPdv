@@ -25,10 +25,10 @@ const INTERVALO_REPROCESSAMENTO = parseInt(process.env.INTERVALO_REPROCESSAMENTO
 // Banco do PDV (onde busca as notas - somente leitura)
 const DB_PDV_CONFIG = {
     server: process.env.DB_PDV_SERVER || 'localhost',
-    database: process.env.DB_PDV_DATABASE || 'TesteNotas',
-    user: process.env.DB_PDV_USER || 'SA',
-    password: process.env.DB_PDV_PASSWORD || 'Senha@123',
-    port: parseInt(process.env.DB_PDV_PORT) || 1433,
+    database: process.env.DB_PDV_DATABASE || 'BancoSammi',
+    user: process.env.DB_PDV_USER || 'usuario_fideliza',
+    password: process.env.DB_PDV_PASSWORD || 'SenhaSegura123!',
+    port: parseInt(process.env.DB_PDV_PORT) || 1435,
     options: {
         encrypt: false,
         trustServerCertificate: true,
@@ -39,10 +39,10 @@ const DB_PDV_CONFIG = {
 // Banco da Aplicação (onde ficam NotasUsadas e PontuacaoPendente)
 const DB_APP_CONFIG = {
     server: process.env.DB_APP_SERVER || 'localhost',
-    database: process.env.DB_APP_DATABASE || 'TesteNotas',
-    user: process.env.DB_APP_USER || 'SA',
-    password: process.env.DB_APP_PASSWORD || 'Senha@123',
-    port: parseInt(process.env.DB_APP_PORT) || 1433,
+    database: process.env.DB_APP_DATABASE || 'BancoFideliza',
+    user: process.env.DB_APP_USER || 'usuario_fideliza',
+    password: process.env.DB_APP_PASSWORD || 'SenhaSegura123!',
+    port: parseInt(process.env.DB_APP_PORT) || 1435,
     options: {
         encrypt: false,
         trustServerCertificate: true,
