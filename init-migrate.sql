@@ -1,4 +1,15 @@
 -- ========================================
+-- SCRIPT DE MIGRAÇÃO COM TRANSAÇÃO E VERIFICAÇÃO
+-- ========================================
+
+-- Iniciar transação
+BEGIN TRANSACTION;
+
+PRINT '========================================';
+PRINT 'INICIANDO TRANSAÇÃO DE MIGRAÇÃO';
+PRINT '========================================';
+
+-- ========================================
 -- CRIAÇÃO DE USUÁRIO E PERMISSÕES
 -- ========================================
 
@@ -12,11 +23,9 @@ ELSE
 BEGIN
     PRINT 'Login usuario_fideliza já existe.';
 END
-GO
 
 -- Configurar permissões para BancoSammi
 USE BancoSammi;
-GO
 
 -- Criar usuário no banco BancoSammi
 IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'usuario_fideliza')
@@ -28,17 +37,14 @@ ELSE
 BEGIN
     PRINT 'Usuário usuario_fideliza já existe no BancoSammi.';
 END
-GO
 
 -- Conceder permissões no BancoSammi
 ALTER ROLE db_datareader ADD MEMBER usuario_fideliza;
 ALTER ROLE db_datawriter ADD MEMBER usuario_fideliza;
 PRINT 'Permissões concedidas ao usuario_fideliza no BancoSammi!';
-GO
 
 -- Configurar permissões para BancoFideliza
 USE BancoFideliza;
-GO
 
 -- Criar usuário no banco BancoFideliza
 IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'usuario_fideliza')
@@ -50,27 +56,17 @@ ELSE
 BEGIN
     PRINT 'Usuário usuario_fideliza já existe no BancoFideliza.';
 END
-GO
 
 -- Conceder permissões no BancoFideliza
 ALTER ROLE db_datareader ADD MEMBER usuario_fideliza;
 ALTER ROLE db_datawriter ADD MEMBER usuario_fideliza;
 PRINT 'Permissões concedidas ao usuario_fideliza no BancoFideliza!';
-GO
 
-PRINT '========================================';
-PRINT 'CONFIGURAÇÃO DE USUÁRIO CONCLUÍDA';
-PRINT 'Login: usuario_fideliza';
-PRINT 'Senha: SenhaSegura123!';
-PRINT 'Bancos com acesso: BancoSammi, BancoFideliza';
-PRINT 'Permissões: Leitura e Escrita';
-PRINT '========================================';
-GO
+-- ========================================
+-- CRIAÇÃO DE TABELAS NO BANCOFIDELIZA
+-- ========================================
 
-
-USE BancoFideliza;
-GO
-
+-- Criar tabela NotasUsadas
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'NotasUsadas')
 BEGIN
     CREATE TABLE NotasUsadas (
@@ -88,7 +84,6 @@ ELSE
 BEGIN
     PRINT 'Tabela NotasUsadas já existe.';
 END
-GO
 
 -- Criar índice para melhorar performance de consultas
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_NotasUsadas_NumeroNota')
@@ -96,12 +91,9 @@ BEGIN
     CREATE INDEX IX_NotasUsadas_NumeroNota ON NotasUsadas(numero_nota);
     PRINT 'Índice IX_NotasUsadas_NumeroNota criado!';
 END
-GO
 
--- Script SQL para criar a tabela PontuacaoPendente
+-- Criar tabela PontuacaoPendente
 -- Esta tabela armazena tentativas de pontuação que falharam para reprocessamento automático
-
--- Verificar se a tabela já existe e criar se não existir
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PontuacaoPendente')
 BEGIN
     CREATE TABLE PontuacaoPendente (
@@ -127,6 +119,124 @@ ELSE
 BEGIN
     PRINT 'Tabela PontuacaoPendente já existe.';
 END
-GO
 
+-- ========================================
+-- VERIFICAÇÕES ANTES DO ROLLBACK
+-- ========================================
 
+PRINT '========================================';
+PRINT 'VERIFICANDO ESTRUTURAS CRIADAS';
+PRINT '========================================';
+
+-- Verificar login criado
+PRINT 'VERIFICANDO LOGIN:';
+SELECT 
+    name as 'Login_Name',
+    type_desc as 'Type',
+    create_date as 'Created_Date',
+    is_disabled as 'Is_Disabled'
+FROM sys.server_principals 
+WHERE name = 'usuario_fideliza';
+
+-- Verificar usuário no BancoSammi
+USE BancoSammi;
+PRINT 'VERIFICANDO USUÁRIO NO BANCOSAMMI:';
+SELECT 
+    dp.name as 'User_Name',
+    dp.type_desc as 'Type',
+    dp.create_date as 'Created_Date'
+FROM sys.database_principals dp
+WHERE dp.name = 'usuario_fideliza';
+
+PRINT 'VERIFICANDO PERMISSÕES NO BANCOSAMMI:';
+SELECT 
+    dp.name as 'Principal_Name',
+    r.name as 'Role_Name'
+FROM sys.database_role_members rm
+JOIN sys.database_principals dp ON rm.member_principal_id = dp.principal_id
+JOIN sys.database_principals r ON rm.role_principal_id = r.principal_id
+WHERE dp.name = 'usuario_fideliza';
+
+-- Verificar usuário no BancoFideliza
+USE BancoFideliza;
+PRINT 'VERIFICANDO USUÁRIO NO BANCOFIDELIZA:';
+SELECT 
+    dp.name as 'User_Name',
+    dp.type_desc as 'Type',
+    dp.create_date as 'Created_Date'
+FROM sys.database_principals dp
+WHERE dp.name = 'usuario_fideliza';
+
+PRINT 'VERIFICANDO PERMISSÕES NO BANCOFIDELIZA:';
+SELECT 
+    dp.name as 'Principal_Name',
+    r.name as 'Role_Name'
+FROM sys.database_role_members rm
+JOIN sys.database_principals dp ON rm.member_principal_id = dp.principal_id
+JOIN sys.database_principals r ON rm.role_principal_id = r.principal_id
+WHERE dp.name = 'usuario_fideliza';
+
+-- Verificar tabelas criadas
+PRINT 'VERIFICANDO TABELAS CRIADAS:';
+SELECT 
+    t.name as 'Table_Name',
+    t.create_date as 'Created_Date',
+    t.type_desc as 'Type'
+FROM sys.tables t
+WHERE t.name IN ('NotasUsadas', 'PontuacaoPendente');
+
+-- Verificar índices criados
+PRINT 'VERIFICANDO ÍNDICES CRIADOS:';
+SELECT 
+    i.name as 'Index_Name',
+    t.name as 'Table_Name',
+    i.type_desc as 'Index_Type'
+FROM sys.indexes i
+JOIN sys.tables t ON i.object_id = t.object_id
+WHERE i.name IN ('IX_NotasUsadas_NumeroNota', 'IX_PontuacaoPendente_NumeroNota', 'IX_PontuacaoPendente_DataCriacao');
+
+-- Verificar estrutura da tabela NotasUsadas
+PRINT 'VERIFICANDO ESTRUTURA DA TABELA NOTASUSADAS:';
+SELECT 
+    c.name as 'Column_Name',
+    t.name as 'Data_Type',
+    c.max_length,
+    c.is_nullable,
+    c.is_identity
+FROM sys.columns c
+JOIN sys.types t ON c.user_type_id = t.user_type_id
+JOIN sys.tables tb ON c.object_id = tb.object_id
+WHERE tb.name = 'NotasUsadas'
+ORDER BY c.column_id;
+
+-- Verificar estrutura da tabela PontuacaoPendente
+PRINT 'VERIFICANDO ESTRUTURA DA TABELA PONTUACAOPENDENTE:';
+SELECT 
+    c.name as 'Column_Name',
+    t.name as 'Data_Type',
+    c.max_length,
+    c.is_nullable,
+    c.is_identity
+FROM sys.columns c
+JOIN sys.types t ON c.user_type_id = t.user_type_id
+JOIN sys.tables tb ON c.object_id = tb.object_id
+WHERE tb.name = 'PontuacaoPendente'
+ORDER BY c.column_id;
+
+PRINT '========================================';
+PRINT 'VERIFICAÇÕES CONCLUÍDAS';
+PRINT 'EXECUTANDO ROLLBACK PARA TESTE';
+PRINT '========================================';
+
+-- ROLLBACK para desfazer todas as alterações (apenas para teste)
+ROLLBACK TRANSACTION;
+
+PRINT '========================================';
+PRINT 'ROLLBACK EXECUTADO COM SUCESSO!';
+PRINT 'TODAS AS ALTERAÇÕES FORAM DESFEITAS';
+PRINT '========================================';
+PRINT '';
+PRINT 'PARA APLICAR AS ALTERAÇÕES DEFINITIVAMENTE:';
+PRINT '1. Substitua "ROLLBACK TRANSACTION;" por "COMMIT TRANSACTION;"';
+PRINT '2. Execute o script novamente';
+PRINT '========================================';
