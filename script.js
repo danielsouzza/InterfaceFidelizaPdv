@@ -1278,10 +1278,6 @@ registerScoreBtn.addEventListener('click', async () => {
                 currentCashback: selectedCustomer.cashback
             });
 
-            // Limpar valor e nota fiscal
-            valueInput.value = '';
-            notaFiscalInput.value = '';
-
             console.log(`Pontuação realizada:`, {
                 cliente: selectedCustomer.name,
                 cpf: selectedCustomer.cpf,
@@ -1290,6 +1286,17 @@ registerScoreBtn.addEventListener('click', async () => {
                 totalPontos: selectedCustomer.points,
                 resposta: result.data
             });
+
+            // Limpar tudo após pontuar com sucesso
+            cpfInput.value = ''; // Limpar campo de busca
+            valueInput.value = ''; // Limpar valor
+            notaFiscalInput.value = ''; // Limpar nota fiscal
+            valueInput.disabled = true; // Desabilitar campo de valor
+            registerScoreBtn.disabled = true; // Desabilitar botão de pontuar
+
+            // Fechar sidebar e limpar cliente selecionado
+            closeSidebarIdentified();
+            selectedCustomer = null;
         } else {
             // Mostrar erro
             showNotification(result.message, 'error');

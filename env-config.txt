@@ -1,0 +1,49 @@
+# ========================================
+# CONFIGURAÇÕES DO SISTEMA DE FIDELIDADE
+# Copie este arquivo para .env na raiz do projeto
+# ========================================
+
+# Porta do servidor
+PORT=3001
+
+# ========================================
+# CONFIGURAÇÕES DA API FIDELIMAX
+# ========================================
+FIDELIMAX_BASE_URL=https://api.fidelimax.com.br/api/Integracao
+FIDELIMAX_AUTH_TOKEN=5e5c32ec-685b-456d-bf8f-a3151bb6a27e-636
+
+# Intervalo de reprocessamento em minutos
+INTERVALO_REPROCESSAMENTO=5
+
+# ========================================
+# BANCO DE DADOS PDV (SOMENTE LEITURA)
+# ========================================
+DB_PDV_SERVER=localhost
+DB_PDV_DATABASE=BancoSammi
+DB_PDV_USER=usuario_fideliza
+DB_PDV_PASSWORD=SenhaSegura123!
+DB_PDV_PORT=1433
+
+# ========================================
+# BANCO DE DADOS DA APLICAÇÃO (LEITURA/ESCRITA)
+# ========================================
+DB_APP_SERVER=localhost
+DB_APP_DATABASE=BancoFideliza
+DB_APP_USER=usuario_fideliza
+DB_APP_PASSWORD=SenhaSegura123!
+DB_APP_PORT=1433
+
+# ========================================
+# CONFIGURAÇÕES DE DESENVOLVIMENTO
+# ========================================
+NODE_ENV=production
+
+# ========================================
+# CONFIGURAÇÕES OPCIONAIS
+# ========================================
+# Timeout para conexões de banco (em ms)
+DB_CONNECTION_TIMEOUT=30000
+DB_REQUEST_TIMEOUT=30000
+
+# Log level (error, warn, info, debug)
+LOG_LEVEL=info
